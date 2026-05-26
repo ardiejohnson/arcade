@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Arcade &mdash; Ardie Johnson</title>
+<meta name="description" content="Browser games with persistent leaderboards. Built by Ardie Johnson." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%95%B9%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#000;
+  --ink:#00ff88;
+  --ink-soft:#00aa66;
+  --ink-faded:#225533;
+  --accent:#ffdd00;
+  --accent-2:#ff5fa2;
+  --frame:#003322;
+}
+html,body{min-height:100%;background:var(--bg);color:var(--ink);font-family:'Courier New',monospace;}
+body{
+  background:
+    radial-gradient(ellipse at center,rgba(0,40,20,0.4) 0%,rgba(0,0,0,1) 80%),
+    repeating-linear-gradient(0deg,rgba(0,255,136,0.03) 0px,rgba(0,255,136,0.03) 1px,transparent 1px,transparent 3px),
+    #000;
+  min-height:100vh;
+  padding:40px 20px 80px;
+  overflow-x:hidden;
+}
+.crt{position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,0.15) 0,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 3px);
+}
+.vignette{position:fixed;inset:0;pointer-events:none;z-index:2;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.7) 100%);
+}
+.container{position:relative;z-index:3;max-width:900px;margin:0 auto;}
+.back{display:inline-block;color:var(--ink-soft);text-decoration:none;font-size:11px;letter-spacing:2px;border:1px solid var(--ink-faded);padding:6px 12px;margin-bottom:30px;}
+.back:hover{color:var(--ink);border-color:var(--ink);}
+.title{text-align:center;margin-bottom:6px;}
+.title h1{
+  font-size:clamp(36px,8vw,68px);font-weight:bold;letter-spacing:4px;
+  color:var(--ink);
+  text-shadow:0 0 8px rgba(0,255,136,0.7),0 0 16px rgba(0,255,136,0.4),0 0 30px rgba(0,255,136,0.2);
+  animation:flicker 4s infinite;
+}
+@keyframes flicker{
+  0%,98%,100%{opacity:1;}
+  98.5%{opacity:0.6;}
+  99%{opacity:1;}
+  99.3%{opacity:0.4;}
+  99.6%{opacity:1;}
+}
+.subtitle{color:var(--ink-soft);font-size:12px;letter-spacing:3px;text-align:center;margin-bottom:50px;}
+.rule{
+  display:flex;align-items:center;gap:10px;margin:0 auto 50px;max-width:500px;
+  color:var(--ink-faded);font-size:10px;letter-spacing:2px;
+}
+.rule::before,.rule::after{content:'';flex:1;height:1px;background:var(--ink-faded);}
+
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-bottom:60px;}
+.game{
+  background:#050a08;
+  border:1px solid var(--frame);
+  padding:24px;
+  text-decoration:none;
+  color:inherit;
+  display:flex;flex-direction:column;
+  transition:border-color 0.15s,transform 0.15s,box-shadow 0.15s;
+  position:relative;
+}
+.game.live:hover{
+  border-color:var(--ink);
+  transform:translateY(-2px);
+  box-shadow:0 0 24px rgba(0,255,136,0.25),0 0 4px rgba(0,255,136,0.4) inset;
+}
+.game .status{
+  position:absolute;top:10px;right:12px;
+  font-size:9px;letter-spacing:2px;
+  padding:2px 6px;border:1px solid currentColor;
+}
+.game.live .status{color:var(--ink);}
+.game.soon{opacity:0.55;cursor:default;}
+.game.soon .status{color:var(--accent-2);border-color:var(--accent-2);}
+.game .icon{font-size:48px;margin-bottom:14px;}
+.game .name{font-size:16px;font-weight:bold;letter-spacing:2px;color:var(--ink);margin-bottom:6px;}
+.game .desc{font-size:11px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;flex:1;}
+.game .play{
+  display:inline-block;margin-top:auto;color:var(--accent);font-size:11px;
+  letter-spacing:3px;font-weight:bold;border-top:1px dashed var(--ink-faded);padding-top:10px;
+}
+.game.soon .play{color:var(--accent-2);}
+
+.footer{text-align:center;color:var(--ink-faded);font-size:10px;letter-spacing:2px;margin-top:80px;}
+.footer a{color:var(--ink-soft);text-decoration:none;}
+.footer a:hover{color:var(--ink);}
+.blink{animation:blink 1s steps(2) infinite;}
+@keyframes blink{50%{opacity:0;}}
+</style>
+</head>
+<body>
+<div class="crt"></div>
+<div class="vignette"></div>
+<div class="container">
+  <a class="back" href="https://ardiejohnson.com">&larr; ARDIEJOHNSON.COM</a>
+
+  <div class="title"><h1>ARCADE</h1></div>
+  <div class="subtitle">BROWSER GAMES &middot; PERSISTENT HIGH SCORES</div>
+  <div class="rule">INSERT COIN</div>
+
+  <div class="games">
+
+    <a class="game live" href="/hoarder-patrol">
+      <div class="status">LIVE</div>
+      <div class="icon">&#127968;</div>
+      <div class="name">HOARDER PATROL</div>
+      <div class="desc">Defend the house from incoming junk. 30 types of clutter, 15 escalating levels, boss hoarders, and one very stressed-out home. Top-down shooter with a shovel.</div>
+      <div class="play">PRESS START &rarr;</div>
+    </a>
+
+    <div class="game soon">
+      <div class="status">SOON</div>
+      <div class="icon">&#128123;</div>
+      <div class="name">???</div>
+      <div class="desc">A new cabinet is being delivered. Check back later.</div>
+      <div class="play"><span class="blink">_</span></div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    A SIDE PROJECT BY <a href="https://ardiejohnson.com">ARDIE JOHNSON</a>
+  </div>
+</div>
+</body>
+</html>
