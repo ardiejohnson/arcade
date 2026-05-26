@@ -6,8 +6,9 @@
 <title>HOARDER PATROL</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;}
-canvas{display:block;background:#000;}
+html,body{height:100%;overflow:hidden;}
+body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;padding:8px;}
+canvas{display:block;background:#000;max-width:100%;max-height:100%;}
 #btns{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
 #btns button{background:#111;color:#0f0;border:1px solid #0f0;padding:8px 11px;font-family:monospace;font-size:14px;border-radius:4px;cursor:pointer;user-select:none;}
 #bnuke{background:#1a0800!important;color:#ff6600!important;border:2px solid #ff6600!important;}
@@ -68,8 +69,25 @@ canvas{display:block;background:#000;}
 <script>
 const cvs=document.getElementById('c'),ctx=cvs.getContext('2d');
 const W=620,H=500,MAX_ITEMS=9,KPW=15;
-const DPR=Math.min(window.devicePixelRatio||1,2);
-cvs.width=W*DPR;cvs.height=H*DPR;cvs.style.width=W+'px';cvs.style.height=H+'px';ctx.scale(DPR,DPR);
+function resizeCanvas(){
+  const btns=document.getElementById('btns'),hint=document.getElementById('hint');
+  const reserve=(btns?btns.offsetHeight:0)+(hint?hint.offsetHeight:0)+36;
+  const availW=Math.max(240,window.innerWidth-16);
+  const availH=Math.max(200,window.innerHeight-reserve-16);
+  const aspect=W/H;
+  let cw,ch;
+  if(availW/availH>aspect){ch=availH;cw=ch*aspect;}else{cw=availW;ch=cw/aspect;}
+  cvs.style.width=cw+'px';cvs.style.height=ch+'px';
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const bw=Math.max(1,Math.round(cw*dpr)),bh=Math.max(1,Math.round(ch*dpr));
+  if(cvs.width!==bw||cvs.height!==bh){
+    cvs.width=bw;cvs.height=bh;
+    ctx.setTransform(bw/W,0,0,bh/H,0,0);
+  }
+}
+resizeCanvas();
+window.addEventListener('resize',resizeCanvas);
+window.addEventListener('orientationchange',resizeCanvas);
 
 // === LEADERBOARD ====================================================
 const LB_API='/api/scores';
