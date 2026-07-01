@@ -106,9 +106,10 @@ canvas{
   <div class="panel">
     <h1>DOW JONES<br>PINBALL</h1>
     <div class="tick">&#9650; WALL STREET SILICON &middot; EST. 1987 &#9650;</div>
-    <p>Launch the golden coin. Pump the <span class="gold">BULL bumpers</span>,
-       spell <span class="gold">M-O-N-E-Y</span> to open the vault, and slam the
-       <span class="gold">IPO JACKPOT</span>. Don't let the market crash down the drain.</p>
+    <p>Hit the <span class="gold">B-U-Y</span> targets to line up a <span class="gold">DEAL</span>,
+       then shoot <span class="gold">THE EXCHANGE</span> to run it &mdash; Short Squeeze, IPO, Buyout,
+       Hostile Takeover. Close deals to climb from <span class="gold">INTERN to MOGUL</span>.
+       Pump the BULL bumpers, spell MONEY, roll the DOW. Don't crash down the drain.</p>
     <div class="keys">
       <span class="blink">&#9660;</span> <b>PULL &amp; RELEASE</b> to launch<br>
       <b>&#8592; / &#8594;</b> or <b>tap left / right</b> = flippers<br>
@@ -260,7 +261,6 @@ const bumpers = [
 // Small posts (bounce dividers): circles with light bounce
 const posts = [
   {x:158,y:172,r:7}, {x:254,y:172,r:7},   // between DOW lanes
-  {x:206,y:150,r:6},                       // guard above center saucer approach
   {x:96,y:470,r:6}, {x:316,y:470,r:6},     // guard the MONEY bank edges
 ];
 
@@ -282,15 +282,27 @@ const lanes = [
   {x:302,y:172,w:44,h:22,ch:'W',lit:0},
 ];
 
-// IPO saucer (top-center capture hole)
-const saucer = {x:206,y:120,r:16};
+// Central "Exchange" hyperspace vortex — Space Cadet's wormhole. Shoot it to start a Deal.
+// Non-physical: the ball passes through, triggers, and is ejected downward (never stuck).
+const vortex = {x:206,y:404,r:20,ring:44,spin:0};
+let vortexCool = 0;
+
+// B-U-Y mission targets (Space Cadet's "mission targets") — light all 3 to select a Deal.
+const BUY = "BUY".split("");
+const buyTargets = [
+  {x:47,y:322,r:11,ch:'B',lit:0},
+  {x:47,y:366,r:11,ch:'U',lit:0},
+  {x:47,y:410,r:11,ch:'Y',lit:0},
+];
 
 // Flippers
 function mkFlip(px,py,rest,active,side){
   return {px,py,len:FLIP_LEN,rest,active,side,angle:rest,prev:rest,omega:0,pressed:false,flash:0};
 }
-const flipL = mkFlip(126,706, 0.475, -0.36, -1);
-const flipR = mkFlip(286,706, Math.PI-0.475, Math.PI+0.36, 1);
+// Pivots spaced so the center tip gap (~44px) clears the ball + flipper thickness,
+// so a centered ball drains instead of cradling forever between the tips.
+const flipL = mkFlip(120,706, 0.475, -0.36, -1);
+const flipR = mkFlip(292,706, Math.PI-0.475, Math.PI+0.36, 1);
 const flippers=[flipL,flipR];
 function flipTip(f){ return [f.px+Math.cos(f.angle)*f.len, f.py+Math.sin(f.angle)*f.len]; }
 
@@ -312,6 +324,26 @@ let messages = [];                // {text,color,until,y}
 let tiltFlash = 0;
 let shakeT = 0, shakeMag = 0;
 
+// ---- Space-Cadet-style DEAL / RANK / DMD systems ----
+// Rank ladder: rank up as your portfolio grows (Space Cadet's Cadet -> Fleet Admiral).
+const RANKS=[['INTERN',0],['ANALYST',25000],['ASSOCIATE',75000],['VP',150000],
+  ['DIRECTOR',300000],['MANAGING DIR',500000],['PARTNER',800000],['CEO',1200000],['MOGUL',2000000]];
+let rank=0;
+// Deals = Space Cadet's "missions". Select one via BUY targets, start it at the Exchange, finish the objective.
+const DEALS=[
+  {name:'SHORT SQUEEZE',    obj:'POP 4 BULL BUMPERS',   kind:'bumper',   need:4, pay:40000},
+  {name:'IPO LAUNCH',       obj:'SHOOT THE EXCHANGE',   kind:'exchange', need:1, pay:35000},
+  {name:'BUYOUT',           obj:'SPELL M-O-N-E-Y',      kind:'money',    need:5, pay:50000},
+  {name:'BULL RUN',         obj:'ROLL THE D-O-W LANES', kind:'dow',      need:3, pay:45000},
+  {name:'HOSTILE TAKEOVER', obj:'POP 6 BULL BUMPERS',   kind:'bumper',   need:6, pay:60000},
+];
+let dealIndex=0;         // rotation pointer into DEALS
+let deal=null;           // active deal object (or null)
+let dealProgress=0;
+let dealArmed=false;     // BUY complete -> Exchange will start a deal
+let dealsClosed=0;
+let dmdMsg='', dmdUntil=0;   // transient DMD override text
+
 function newBall(x,y,vx,vy){ return {x,y,vx:vx||0,vy:vy||0,r:BALL_R,spin:0,trail:[]}; }
 
 function resetTargets(){ targets.forEach(t=>t.lit=0); }
@@ -322,6 +354,8 @@ function startGame(){
   score=0; ballsLeft=3; bullRun=1; jackpots=0; jackpotLit=false; bumperHits=0;
   multiballActive=false; messages=[]; resetTargets(); resetLanes();
   bumpers.forEach(b=>b.lit=0);
+  rank=0; dealIndex=0; deal=null; dealProgress=0; dealArmed=false; dealsClosed=0;
+  dmdMsg=''; dmdUntil=0; buyTargets.forEach(t=>t.lit=0);
   spawnBallToLane();
   hide('start-ov'); hide('over-ov'); hide('name-ov');
   state='launch';
@@ -353,7 +387,7 @@ function flash(text,color,ms){
 }
 function shake(mag){ shakeT=now()+220; shakeMag=mag; }
 
-function addScore(n){ score += Math.round(n); }
+function addScore(n){ score += Math.round(n); checkRank(); }
 
 // ---------- Ball loss / next ball ----------
 function ballDrained(idx){
@@ -382,8 +416,8 @@ function endGame(){
   // update overlay
   document.getElementById('over-score').textContent = '$'+score.toLocaleString();
   document.getElementById('over-stats').innerHTML =
-    'BULL RUN x'+bullRun+' &middot; '+jackpots+' IPO'+(jackpots===1?'':'S')+' &middot; '+bumperHits+' TRADES<br>'+
-    '<span class="gold">BEST: $'+bestScore.toLocaleString()+'</span>';
+    'RANK: '+RANKS[rank][0]+' &middot; '+dealsClosed+' DEAL'+(dealsClosed===1?'':'S')+' CLOSED &middot; '+jackpots+' IPO'+(jackpots===1?'':'S')+'<br>'+
+    'BULL x'+bullRun+' &middot; '+bumperHits+' TRADES &middot; <span class="gold">BEST: $'+bestScore.toLocaleString()+'</span>';
   const title=document.getElementById('over-title');
   if(score>=bestScore && score>0){ title.textContent='NEW RECORD!'; }
   else { title.textContent='MARKET CLOSED'; }
@@ -459,22 +493,28 @@ function checkTriggers(b){
         bullRun=Math.min(bullRun+1,9); resetLanes();
         addScore(2000*bullRun); sBull();
         flash("BULL RUN  x"+bullRun+"!", 'gold', 1800); shake(4);
+        dealEvent('dow',3);
       }
     }
   }
-  // IPO saucer capture
-  if(dist(b.x,b.y,saucer.x,saucer.y) < saucer.r){
-    if(jackpotLit){
-      addScore(20000*bullRun); jackpots++; jackpotLit=false;
-      sJack(); shake(7);
-      flash("IPO JACKPOT!  +$"+(20000*bullRun).toLocaleString(), 'gold', 2200);
+  // Central EXCHANGE vortex — shoot-through: start a deal / progress it / bank the IPO jackpot
+  if(now()>vortexCool && dist(b.x,b.y,vortex.x,vortex.y) < vortex.r){
+    vortexCool = now()+600;
+    if(dealArmed && !deal){
+      startDeal();
+    } else if(deal && deal.kind==='exchange'){
+      addScore(3000*bullRun); flash('EXCHANGE HIT', 'ink', 1100); sCoin();
+      dealEvent('exchange',1);
+    } else if(jackpotLit){
+      addScore(25000*bullRun); jackpots++; jackpotLit=false; sJack(); shake(7);
+      flash('IPO JACKPOT!  +$'+(25000*bullRun).toLocaleString(), 'gold', 2400);
+      setDMD('IPO JACKPOT!  +$'+(25000*bullRun).toLocaleString(), 2600);
     } else {
       addScore(1500*bullRun); sCoin();
-      flash("DIVIDEND  +$"+(1500*bullRun).toLocaleString(), 'ink', 1300);
+      flash('MARKET TICK  +$'+(1500*bullRun).toLocaleString(), 'ink', 1100);
     }
-    // eject downward into play
-    b.x=saucer.x; b.y=saucer.y+saucer.r+b.r+2;
-    b.vx=rand(-2,2); b.vy=6.5;
+    // eject the ball downward out of the vortex
+    b.x=vortex.x; b.y=vortex.y+vortex.r+b.r+2; b.vx=rand(-2.4,2.4); b.vy=6.8;
   }
 }
 
@@ -511,8 +551,15 @@ function physics(){
       for(const p of posts) collideCircle(b, p.x,p.y,p.r, 0.5, 0.4);
       for(const bp of bumpers){
         if(collideCircle(b, bp.x,bp.y,bp.r, 0.35, 5.6)){
-          if(bp.lit<0.9){ bumperHits++; addScore(250*bullRun); sBump(); }  // guard vs multi-substep double count
+          if(bp.lit<0.9){ bumperHits++; addScore(250*bullRun); sBump(); dealEvent('bumper',1); }  // guard vs multi-substep double count
           bp.lit=1;
+        }
+      }
+      for(const t of buyTargets){
+        if(!t.lit && collideCircle(b, t.x,t.y,t.r, 0.4, 1.6)){
+          t.lit=1; addScore(900*bullRun); sTarget(); flash(t.ch,'blue',700); armDealCheck();
+        } else if(t.lit){
+          collideCircle(b, t.x,t.y,t.r, 0.4, 0.5);
         }
       }
       for(const t of targets){
@@ -547,8 +594,10 @@ function completeMoney(){
   resetTargets();
   jackpotLit=true;
   addScore(5000*bullRun);
-  flash("VAULT OPEN - SHOOT THE IPO!", 'gold', 2200);
+  flash("VAULT OPEN - SHOOT THE EXCHANGE!", 'gold', 2200);
+  setDMD("VAULT OPEN - SHOOT THE EXCHANGE FOR THE IPO JACKPOT", 2600);
   sBull(); shake(4);
+  dealEvent('money',5);
   // reward multiball if space
   if(!multiballActive && balls.length<3){
     const add = Math.min(2, 3-balls.length);
@@ -559,6 +608,54 @@ function completeMoney(){
     flash("BULL MARKET MULTIBALL!", 'ink', 2400);
     setTimeout(sJack,120);
   }
+}
+
+// ---------- Deals / Rank / DMD (Space Cadet-style mission system) ----------
+function setDMD(msg,ms){ dmdMsg=msg; dmdUntil=now()+(ms||2200); }
+function baseDMD(){
+  if(deal)      return deal.name+'  '+deal.obj+'   ['+Math.min(dealProgress,deal.need)+'/'+deal.need+']';
+  if(dealArmed) return 'DEAL READY  >>  SHOOT THE EXCHANGE';
+  return 'HIT  B-U-Y  TARGETS TO SELECT A DEAL';
+}
+function currentDMD(){ return now()<dmdUntil ? dmdMsg : baseDMD(); }
+function checkRank(){
+  while(rank<RANKS.length-1 && score>=RANKS[rank+1][1]){
+    rank++;
+    flash('PROMOTED: '+RANKS[rank][0], 'gold', 2600);
+    setDMD('>> PROMOTED TO '+RANKS[rank][0]+' <<', 2600);
+    sBull(); shake(4);
+  }
+}
+function armDealCheck(){
+  if(buyTargets.every(t=>t.lit)){
+    buyTargets.forEach(t=>t.lit=0);
+    dealArmed=true;
+    flash('DEAL ARMED', 'ink', 1600);
+    setDMD('DEAL READY  >>  SHOOT THE EXCHANGE', 2600);
+    sBull();
+  }
+}
+function startDeal(){
+  deal=DEALS[dealIndex%DEALS.length]; dealIndex++;
+  dealProgress=0; dealArmed=false;
+  flash(deal.name+'!', 'gold', 2200);
+  setDMD(deal.name+' - '+deal.obj, 3000);
+  sJack(); shake(5);
+}
+function dealEvent(kind, amount){
+  if(!deal || deal.kind!==kind) return;
+  dealProgress += amount;
+  if(dealProgress>=deal.need) closeDeal();
+}
+function closeDeal(){
+  const pay = Math.round(deal.pay * bullRun * (1 + rank*0.15));
+  const nm = deal.name;
+  deal=null; dealProgress=0;
+  addScore(pay); dealsClosed++;
+  jackpotLit=true;                 // reward: the IPO jackpot is now lit at the Exchange
+  flash('DEAL CLOSED  +$'+pay.toLocaleString(), 'gold', 2600);
+  setDMD('DEAL CLOSED! '+nm+'  +$'+pay.toLocaleString(), 3000);
+  sJack(); shake(6);
 }
 
 // ---------- Flipper update ----------
@@ -586,7 +683,8 @@ function draw(){
   drawPlayfieldBg();
   drawWalls();
   drawLanes();
-  drawSaucer(ts);
+  drawVortex(ts);
+  drawBuyTargets();
   drawTargets(ts);
   drawBumpers(ts);
   drawPosts();
@@ -595,6 +693,7 @@ function draw(){
   drawPlungerLane();
   drawBalls(ts);
   drawHUD(ts);
+  drawDMD(ts);
   drawMessages(ts);
   ctx.restore();
 }
@@ -614,13 +713,11 @@ function drawPlayfieldBg(){
   ctx.strokeStyle='rgba(0,255,136,0.05)'; ctx.lineWidth=1;
   for(let y=120;y<800;y+=36){ ctx.beginPath(); ctx.moveTo(26,y); ctx.lineTo(414,y); ctx.stroke(); }
   ctx.restore();
-  // "DOW JONES" big faded backglass wordmark mid-field
+  // "DOW JONES" faded backglass wordmark, kept clear of the central vortex
   ctx.save();
-  ctx.globalAlpha=0.10; ctx.textAlign='center'; ctx.fillStyle='#ffcc22';
-  ctx.font='bold 30px Courier New';
-  ctx.fillText('DOW JONES', 220, 400);
-  ctx.font='bold 15px Courier New';
-  ctx.fillText('WALL ST', 220, 560);
+  ctx.globalAlpha=0.09; ctx.textAlign='center'; ctx.fillStyle='#ffcc22';
+  ctx.font='bold 26px Courier New';
+  ctx.fillText('DOW JONES', 220, 600);
   ctx.restore();
   // decorative jagged "stock chart" going up
   ctx.save();
@@ -658,26 +755,61 @@ function drawLanes(){
   ctx.fillText('ROLL THE DOW', 206, 200); ctx.restore();
 }
 
-function drawSaucer(ts){
-  const lit=jackpotLit;
-  const pulse=lit? (0.6+0.4*Math.sin(ts/120)) : 0.4;
+function drawVortex(ts){
+  vortex.spin += 0.05;
+  const armed = dealArmed && !deal;
+  const hot = armed || jackpotLit || (deal && deal.kind==='exchange');
+  const col = hot ? '#ffcc22' : '#33ccff';
+  // LED ring (the iconic Space Cadet wormhole)
+  const n=24;
+  for(let i=0;i<n;i++){
+    const a=i/n*Math.PI*2 + vortex.spin*0.3;
+    const x=vortex.x+Math.cos(a)*vortex.ring, y=vortex.y+Math.sin(a)*vortex.ring*0.9;
+    const on = hot ? ((i+Math.floor(ts/90))%2===0) : ((i+Math.floor(ts/260))%4===0);
+    ctx.beginPath(); ctx.arc(x,y,on?2.6:1.6,0,7);
+    ctx.fillStyle= on ? col : 'rgba(40,70,90,0.6)';
+    ctx.shadowColor=col; ctx.shadowBlur= on?8:0; ctx.fill();
+  }
+  ctx.shadowBlur=0;
+  // swirling center
   ctx.save();
-  ctx.beginPath(); ctx.arc(saucer.x,saucer.y,saucer.r,0,7);
-  ctx.fillStyle = lit? 'rgba(255,204,34,'+ (0.25*pulse) +')' : 'rgba(50,80,70,0.25)';
-  ctx.fill();
-  ctx.lineWidth=2; ctx.strokeStyle = lit? '#ffcc22':'#2a6a52';
-  if(lit){ ctx.shadowColor='#ffcc22'; ctx.shadowBlur=14*pulse; }
-  ctx.stroke();
-  ctx.fillStyle= lit? '#ffcc22':'#3a7a58'; ctx.font='bold 10px Courier New';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('IPO', saucer.x, saucer.y);
+  ctx.translate(vortex.x,vortex.y); ctx.rotate(vortex.spin);
+  for(let k=0;k<3;k++){
+    ctx.beginPath();
+    for(let a=0;a<Math.PI*2;a+=0.3){
+      const rr=vortex.r*(a/(Math.PI*2))+k*3;
+      const x=Math.cos(a+k*2)*rr, y=Math.sin(a+k*2)*rr;
+      if(a===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle= hot? 'rgba(255,204,34,0.5)':'rgba(51,204,255,0.4)'; ctx.lineWidth=1.5; ctx.stroke();
+  }
   ctx.restore();
+  // label
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=col; ctx.font='bold 9px Courier New';
+  if(hot){ ctx.shadowColor=col; ctx.shadowBlur=10; }
+  ctx.fillText('THE EXCHANGE', vortex.x, vortex.y+vortex.ring+11);
+  ctx.restore();
+}
+
+function drawBuyTargets(){
+  ctx.save(); ctx.fillStyle='#1c6a80'; ctx.font='9px Courier New'; ctx.textAlign='center';
+  ctx.fillText('DEAL', 47, 300); ctx.restore();
+  for(const t of buyTargets){
+    const col=t.lit?'#33ccff':'#16455a';
+    ctx.save(); ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,7);
+    if(t.lit){ ctx.shadowColor='#33ccff'; ctx.shadowBlur=10; }
+    ctx.fillStyle=t.lit?'rgba(51,204,255,0.18)':'#080d10'; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke();
+    ctx.fillStyle=col; ctx.font='bold 13px Courier New'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(t.ch,t.x,t.y); ctx.restore();
+  }
 }
 
 function drawTargets(ts){
   // caption
   ctx.save(); ctx.fillStyle='#a8791a'; ctx.font='9px Courier New'; ctx.textAlign='center';
-  ctx.fillText('SPELL MONEY - OPEN THE VAULT', 206, 442); ctx.restore();
+  ctx.fillText('SPELL MONEY - OPEN THE VAULT', 206, 492); ctx.restore();
   for(const t of targets){
     const col = t.lit ? '#ffcc22' : '#5a4413';
     ctx.save();
@@ -819,14 +951,36 @@ function drawHUD(ts){
   if(jackpotLit){
     ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#ffcc22';
     ctx.font='bold 10px Courier New'; ctx.globalAlpha=0.6+0.4*Math.sin(ts/120);
-    ctx.fillText('>> IPO JACKPOT IS LIT <<', 206, 100); ctx.restore();
+    ctx.fillText('>> IPO JACKPOT IS LIT AT THE EXCHANGE <<', 206, 92); ctx.restore();
   }
-  // ball-save indicator
-  if(state==='play' && now()<ballSaveUntil){
-    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#33ccff';
-    ctx.font='9px Courier New'; ctx.globalAlpha=0.5+0.5*Math.sin(ts/100);
-    ctx.fillText('BALL SAVE ACTIVE', 206, VH-14); ctx.restore();
-  }
+}
+
+// Bottom DMD marquee: rank (left), deals (right), live mission narration (center)
+function drawDMD(ts){
+  const y0=VH-32, h=32;
+  ctx.save();
+  ctx.fillStyle='#0a0600'; ctx.fillRect(0,y0,VW,h);
+  ctx.fillStyle='rgba(255,160,0,0.05)'; ctx.fillRect(0,y0,VW,h);
+  ctx.strokeStyle='#3a2600'; ctx.lineWidth=1; ctx.strokeRect(0.5,y0+0.5,VW-1,h-1);
+  ctx.textBaseline='middle';
+  // rank (left)
+  ctx.textAlign='left'; ctx.fillStyle='#a86f10'; ctx.font='8px Courier New';
+  ctx.fillText('RANK', 8, y0+9);
+  ctx.fillStyle='#ffcc22'; ctx.font='bold 10px Courier New';
+  ctx.fillText(RANKS[rank][0], 8, y0+22, 96);
+  // deals closed (right)
+  ctx.textAlign='right'; ctx.fillStyle='#a86f10'; ctx.font='8px Courier New';
+  ctx.fillText('DEALS', VW-8, y0+9);
+  ctx.fillStyle='#ffcc22'; ctx.font='bold 10px Courier New';
+  ctx.fillText(String(dealsClosed), VW-8, y0+22);
+  // center narration
+  let txt, col;
+  if(state==='play' && now()<ballSaveUntil && now()>=dmdUntil){ txt='BALL SAVE ACTIVE'; col='#33ccff'; }
+  else { const fl=now()<dmdUntil; txt=currentDMD(); col=fl?'#ffcc22':'#ffa000'; }
+  ctx.textAlign='center'; ctx.fillStyle=col; ctx.font='bold 11px Courier New';
+  ctx.shadowColor=col; ctx.shadowBlur=(now()<dmdUntil)?8:0;
+  ctx.fillText(txt, VW/2, y0+16, VW-104);
+  ctx.restore();
 }
 
 function drawMessages(ts){
@@ -1001,7 +1155,7 @@ document.getElementById('ne-form').addEventListener('submit',async e=>{
   playerName=name; try{localStorage.setItem('arcadeName',name)}catch{}
   btn.disabled=true; btn.textContent='SAVING...'; status.textContent='';
   try{
-    await submitScore(name,score,bullRun,jackpots);
+    await submitScore(name,score,rank+1,dealsClosed);
     scoreSubmitted=true; hide('name-ov'); renderBoard();
   }catch(err){
     status.textContent='Could not save (offline?). Try again or skip.';
