@@ -5,7 +5,7 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-const GAMES = new Set(['hoarder-patrol']);
+const GAMES = new Set(['hoarder-patrol', 'dow-jones-pinball']);
 const MAX_KEEP = 100;
 
 const cleanName = (raw) =>

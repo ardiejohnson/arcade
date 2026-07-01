@@ -5,6 +5,7 @@ Browser games with a shared leaderboard. Deployed to **arcade.ardiejohnson.com**
 ## Games
 
 - **Hoarder Patrol** — defend the house from incoming junk. `/hoarder-patrol`
+- **Dow Jones Pinball** — 8-bit Wall Street pinball; spell MONEY, hit the IPO jackpot. `/dow-jones-pinball`
 
 Add a new game by dropping `<game-slug>.html` into the repo root, adding the
 slug to the `GAMES` set in `api/scores.js`, and linking it from `index.html`.

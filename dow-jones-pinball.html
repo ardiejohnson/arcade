@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Dow Jones Pinball &mdash; Arcade</title>
+<meta name="description" content="An 8-bit Wall Street pinball machine. Rack up the Dow, trigger the Bull Market, hit the IPO jackpot. Built for Dow Jones." />
+<meta name="theme-color" content="#000000" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E" />
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#05060a;
+  --ink:#00ff88;
+  --gold:#ffcc22;
+  --gold-soft:#a8791a;
+  --red:#ff4466;
+  --blue:#33ccff;
+  --frame:#0c2a1c;
+}
+html,body{
+  height:100%;width:100%;overflow:hidden;
+  background:var(--bg);color:var(--ink);
+  font-family:'Courier New',monospace;
+  touch-action:none;overscroll-behavior:none;
+  position:fixed;
+}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+canvas{
+  display:block;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  touch-action:none;
+  background:#05060a;
+}
+/* CRT overlays */
+.crt{position:fixed;inset:0;pointer-events:none;z-index:5;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,0.16) 0,rgba(0,0,0,0.16) 1px,transparent 1px,transparent 3px);}
+.vig{position:fixed;inset:0;pointer-events:none;z-index:6;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.75) 100%);}
+
+/* Overlays (start / gameover / name entry) share styling */
+.overlay{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(ellipse at center,rgba(4,20,12,0.92) 0%,rgba(0,0,0,0.96) 90%);}
+.overlay.show{display:flex;}
+.panel{
+  width:100%;max-width:420px;text-align:center;
+  border:2px solid var(--frame);background:#040807;
+  padding:26px 22px 30px;position:relative;
+  box-shadow:0 0 40px rgba(0,255,136,0.15),0 0 0 4px #000 inset;
+}
+.panel h1{
+  font-size:clamp(26px,7vw,40px);letter-spacing:2px;line-height:1.05;color:var(--gold);
+  text-shadow:0 0 10px rgba(255,204,34,0.6),0 0 24px rgba(255,204,34,0.25);
+  margin-bottom:4px;
+}
+.panel .tick{color:var(--ink);font-size:12px;letter-spacing:3px;margin-bottom:18px;}
+.panel p{color:var(--ink);font-size:12px;line-height:1.7;letter-spacing:1px;margin:10px 0;}
+.panel .dim{color:#3a7a58;font-size:11px;}
+.panel .gold{color:var(--gold);}
+.panel .red{color:var(--red);}
+.keys{font-size:11px;color:#5fd7a0;line-height:1.9;letter-spacing:1px;margin:14px 0 6px;}
+.keys b{color:var(--gold);}
+.btn{
+  display:inline-block;margin-top:16px;cursor:pointer;
+  border:2px solid var(--ink);color:#031;background:var(--ink);
+  font-family:inherit;font-weight:bold;font-size:15px;letter-spacing:3px;
+  padding:12px 26px;text-transform:uppercase;
+  box-shadow:0 0 18px rgba(0,255,136,0.4);
+}
+.btn:active{transform:translateY(1px);}
+.btn.ghost{background:transparent;color:var(--ink);}
+.ded{margin-top:18px;font-size:10px;letter-spacing:2px;color:var(--gold-soft);}
+.ded b{color:var(--gold);}
+.blink{animation:blink 1s steps(2) infinite;}
+@keyframes blink{50%{opacity:0.15;}}
+
+/* Name entry input */
+#ne-input{
+  width:100%;margin-top:14px;background:#010402;border:2px solid var(--ink-faded,#225533);
+  color:var(--gold);font-family:inherit;font-size:22px;letter-spacing:6px;text-align:center;
+  padding:12px 8px;text-transform:uppercase;outline:none;
+}
+#ne-input:focus{border-color:var(--gold);}
+.ne-row{display:flex;gap:10px;justify-content:center;margin-top:14px;}
+.ne-row .btn{margin-top:0;font-size:13px;padding:11px 18px;}
+#ne-status{min-height:16px;font-size:11px;color:var(--red);margin-top:10px;}
+
+/* Board list on gameover */
+.board{margin:12px auto 4px;max-width:320px;text-align:left;font-size:11px;color:var(--ink);}
+.board .row{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #123;}
+.board .row.me{color:var(--gold);}
+.board .rank{color:#3a7a58;width:26px;display:inline-block;}
+.board .nm{flex:1;padding:0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.board .sc{color:var(--gold);}
+.loading{color:#3a7a58;font-size:11px;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c"></canvas></div>
+<div class="crt"></div>
+<div class="vig"></div>
+
+<!-- START -->
+<div class="overlay show" id="start-ov">
+  <div class="panel">
+    <h1>DOW JONES<br>PINBALL</h1>
+    <div class="tick">&#9650; WALL STREET SILICON &middot; EST. 1987 &#9650;</div>
+    <p>Launch the golden coin. Pump the <span class="gold">BULL bumpers</span>,
+       spell <span class="gold">M-O-N-E-Y</span> to open the vault, and slam the
+       <span class="gold">IPO JACKPOT</span>. Don't let the market crash down the drain.</p>
+    <div class="keys">
+      <span class="blink">&#9660;</span> <b>PULL &amp; RELEASE</b> to launch<br>
+      <b>&#8592; / &#8594;</b> or <b>tap left / right</b> = flippers<br>
+      <b>SPACE</b> or hold = plunger
+    </div>
+    <div class="btn" id="start-btn">INSERT COIN</div>
+    <div class="ded">A CABINET BUILT FOR <b>DOW JONES</b></div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div class="overlay" id="over-ov">
+  <div class="panel">
+    <h1 id="over-title">MARKET CLOSED</h1>
+    <div class="tick" id="over-sub">FINAL PORTFOLIO</div>
+    <p class="gold" style="font-size:26px;letter-spacing:2px;" id="over-score">0</p>
+    <p class="dim" id="over-stats"></p>
+    <div id="board-wrap" class="board"><div class="loading">loading leaderboard...</div></div>
+    <div class="btn" id="over-btn">PLAY AGAIN</div>
+    <div><a class="btn ghost" href="/" style="margin-top:12px;">&#8592; ARCADE</a></div>
+  </div>
+</div>
+
+<!-- NAME ENTRY -->
+<div class="overlay" id="name-ov">
+  <div class="panel">
+    <h1 style="font-size:30px;">HIGH SCORE!</h1>
+    <div class="tick">YOU MADE THE BIG BOARD</div>
+    <p class="gold" style="font-size:24px;" id="ne-score">0</p>
+    <p class="dim">ENTER YOUR TRADER TAG</p>
+    <form id="ne-form" autocomplete="off">
+      <input id="ne-input" maxlength="16" placeholder="DOW" />
+      <div id="ne-status"></div>
+      <div class="ne-row">
+        <button type="submit" class="btn">SUBMIT</button>
+        <button type="button" class="btn ghost skip">SKIP</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   DOW JONES PINBALL  —  self-contained 8-bit pinball for arcade.ardiejohnson.com
+   Money / Wall Street theme.  Mobile-first. Shared leaderboard via /api/scores.
+   ===================================================================== */
+
+// ---------- Virtual playfield (rendered scaled to fit any screen) ----------
+const VW = 440, VH = 840;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let scale = 1, offX = 0, offY = 0, DPR = 1;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  scale = Math.min(vw / VW, vh / VH);
+  const w = Math.round(VW * scale), h = Math.round(VH * scale);
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.width = Math.round(w * DPR);
+  canvas.height = Math.round(h * DPR);
+  offX = 0; offY = 0;
+  ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+resize();
+
+// ---------- Audio ----------
+let AC = null;
+function ensureAudio(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==='suspended') AC.resume(); }
+function beep(f,d,type='square',v=0.06){
+  if(!AC) return;
+  try{ const o=AC.createOscillator(),g=AC.createGain(); o.connect(g); g.connect(AC.destination);
+    o.type=type; o.frequency.value=f; g.gain.setValueAtTime(v,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0008,AC.currentTime+d); o.start(); o.stop(AC.currentTime+d);
+  }catch(e){}
+}
+const sFlip   = ()=>beep(150,.04,'square',.05);
+const sBump   = ()=>{beep(520,.05,'square',.06);beep(760,.04,'square',.03);};
+const sSling  = ()=>beep(340,.05,'sawtooth',.05);
+const sTarget = ()=>{beep(880,.04,'square',.05);beep(1200,.05,'square',.03);};
+const sLane   = ()=>beep(660,.05,'triangle',.05);
+const sLaunch = ()=>{beep(180,.10,'sawtooth',.07);beep(300,.14,'square',.05);};
+const sDrain  = ()=>{beep(200,.18,'sawtooth',.07);setTimeout(()=>beep(120,.30,'sawtooth',.07),110);};
+const sJack   = ()=>{[0,90,180,270,360].forEach((t,i)=>setTimeout(()=>beep(500+i*180,.10,'square',.06),t));};
+const sBull   = ()=>{[0,70,140].forEach((t,i)=>setTimeout(()=>beep(400+i*160,.09,'square',.06),t));};
+const sSave   = ()=>{beep(700,.08,'sine',.06);setTimeout(()=>beep(1000,.10,'sine',.05),90);};
+const sCoin   = ()=>{beep(988,.06,'square',.05);setTimeout(()=>beep(1319,.10,'square',.05),70);};
+
+// ---------- Vector helpers ----------
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rand=(a,b)=>a+Math.random()*(b-a);
+const dist=(ax,ay,bx,by)=>Math.hypot(ax-bx,ay-by);
+
+// ---------- Physics constants ----------
+const BALL_R = 10;
+const GRAV = 0.40;
+const MAXV = 27;               // high enough that a launch clears the shooter lane
+const SUB = 6;                 // physics substeps per frame
+const DAMP = 0.9992;           // slight air damping so ball settles
+const FLIP_LEN = 72;
+const FLIP_THK = 7;
+const DRAIN_Y = 800;
+
+// ---------- Table geometry ----------
+// Walls: {a:[x,y], b:[x,y], e:restitution, kick:0}
+function W(ax,ay,bx,by,e,kick){ return {ax,ay,bx,by,e:e==null?0.30:e,kick:kick||0}; }
+const walls = [
+  // --- outer dome / top, sweeping right into the plunger lane outer wall ---
+  W(26,150, 58,96),
+  W(58,96, 120,64),
+  W(120,64, 200,54),
+  W(200,54, 292,64),
+  W(292,64, 356,102),
+  W(356,102, 392,150),
+  W(392,150, 414,200),
+  W(414,200, 414,806),        // outer right = plunger lane outer edge
+  // --- left wall down ---
+  W(26,150, 26,742),
+  // --- plunger lane inner wall (playfield right boundary); open above y=196 so ball exits ---
+  W(386,196, 386,806),
+  // --- lower-left drain funnel (ball reaching bottom-left is lost) ---
+  W(26,742, 70,806),
+  // --- left slingshot (triangle) ---
+  W(80,636, 80,724),                 // left face
+  W(80,724, 140,700),                // bottom face
+  W(140,700, 80,636, 0.55, 4.2),     // KICK face (upper-right)
+  // --- right slingshot (triangle) ---
+  W(332,636, 332,724),
+  W(332,724, 272,700),
+  W(272,700, 332,636, 0.55, 4.2),    // KICK face (upper-left)
+];
+
+// Slingshot kick faces get flashed; track their indices
+const LEFT_SLING = walls.length-4, RIGHT_SLING = walls.length-1;
+
+// Bumpers (the "BULL" pop bumpers): {x,y,r}
+const bumpers = [
+  {x:150,y:250,r:23,lit:0},
+  {x:262,y:250,r:23,lit:0},
+  {x:206,y:322,r:23,lit:0},
+];
+
+// Small posts (bounce dividers): circles with light bounce
+const posts = [
+  {x:158,y:172,r:7}, {x:254,y:172,r:7},   // between DOW lanes
+  {x:206,y:150,r:6},                       // guard above center saucer approach
+  {x:96,y:470,r:6}, {x:316,y:470,r:6},     // guard the MONEY bank edges
+];
+
+// MONEY standup targets (spell M-O-N-E-Y to open the vault)
+const MONEY = "MONEY".split("");
+const targets = [
+  {x:120,y:470,r:11,ch:'M',lit:0},
+  {x:163,y:470,r:11,ch:'O',lit:0},
+  {x:206,y:470,r:11,ch:'N',lit:0},
+  {x:249,y:470,r:11,ch:'E',lit:0},
+  {x:292,y:470,r:11,ch:'Y',lit:0},
+];
+
+// DOW rollover lanes (roll through all 3 -> Bull Run, +multiplier)
+const DOW = "DOW".split("");
+const lanes = [
+  {x:110,y:172,w:44,h:22,ch:'D',lit:0},
+  {x:206,y:172,w:44,h:22,ch:'O',lit:0},
+  {x:302,y:172,w:44,h:22,ch:'W',lit:0},
+];
+
+// IPO saucer (top-center capture hole)
+const saucer = {x:206,y:120,r:16};
+
+// Flippers
+function mkFlip(px,py,rest,active,side){
+  return {px,py,len:FLIP_LEN,rest,active,side,angle:rest,prev:rest,omega:0,pressed:false,flash:0};
+}
+const flipL = mkFlip(126,706, 0.475, -0.36, -1);
+const flipR = mkFlip(286,706, Math.PI-0.475, Math.PI+0.36, 1);
+const flippers=[flipL,flipR];
+function flipTip(f){ return [f.px+Math.cos(f.angle)*f.len, f.py+Math.sin(f.angle)*f.len]; }
+
+// ---------- Game state ----------
+let state = 'start';              // start | launch | play | drain | over
+let balls = [];
+let ballsLeft = 3;
+let score = 0;
+let bullRun = 1;                  // multiplier
+let jackpots = 0;
+let jackpotLit = false;
+let bumperHits = 0;
+let plunger = 0;                  // 0..1 charge
+let charging = false;
+let multiballActive = false;
+let ballSaveUntil = 0;
+let bestScore = (()=>{try{return parseInt(localStorage.getItem('djp_best')||'0',10)||0}catch{return 0}})();
+let messages = [];                // {text,color,until,y}
+let tiltFlash = 0;
+let shakeT = 0, shakeMag = 0;
+
+function newBall(x,y,vx,vy){ return {x,y,vx:vx||0,vy:vy||0,r:BALL_R,spin:0,trail:[]}; }
+
+function resetTargets(){ targets.forEach(t=>t.lit=0); }
+function resetLanes(){ lanes.forEach(l=>l.lit=0); }
+
+function startGame(){
+  ensureAudio();
+  score=0; ballsLeft=3; bullRun=1; jackpots=0; jackpotLit=false; bumperHits=0;
+  multiballActive=false; messages=[]; resetTargets(); resetLanes();
+  bumpers.forEach(b=>b.lit=0);
+  spawnBallToLane();
+  hide('start-ov'); hide('over-ov'); hide('name-ov');
+  state='launch';
+}
+function spawnBallToLane(){
+  balls=[ newBall(400, 770, 0, 0) ];
+  plunger=0; charging=false;
+  state='launch';
+  ballSaveUntil=0;
+}
+function launchBall(){
+  const b=balls[0]; if(!b) return;
+  const power = clamp(plunger,0.12,1);
+  // must clear the full shooter lane (~600px climb) so even a light pull reaches the playfield
+  b.vy = -(23 + power*4);
+  b.vx = rand(-0.6,0.4);
+  plunger=0; charging=false;
+  state='play';
+  ballSaveUntil = now() + 6000;   // generous ball-save for mobile
+  sLaunch();
+  flash("MARKET OPEN", 'ink', 1100);
+}
+
+function now(){ return performance.now(); }
+
+function flash(text,color,ms){
+  messages.push({text, color:color||'ink', until:now()+(ms||1200)});
+  if(messages.length>4) messages.shift();
+}
+function shake(mag){ shakeT=now()+220; shakeMag=mag; }
+
+function addScore(n){ score += Math.round(n); }
+
+// ---------- Ball loss / next ball ----------
+function ballDrained(idx){
+  balls.splice(idx,1);
+  if(balls.length>0){
+    // multiball still going
+    if(balls.length===1) multiballActive=false;
+    return;
+  }
+  // last ball drained
+  if(now() < ballSaveUntil){
+    flash("BALL SAVED", 'blue', 1500); sSave();
+    spawnBallToLane();
+    return;
+  }
+  sDrain(); shake(6);
+  flash("MARKET CRASH", 'red', 1500);
+  ballsLeft--;
+  if(ballsLeft<=0){ endGame(); }
+  else { setTimeout(()=>{ if(state!=='over'){ spawnBallToLane(); } }, 700); state='drain'; }
+}
+
+function endGame(){
+  state='over';
+  if(score>bestScore){ bestScore=score; try{localStorage.setItem('djp_best',String(score))}catch{} }
+  // update overlay
+  document.getElementById('over-score').textContent = '$'+score.toLocaleString();
+  document.getElementById('over-stats').innerHTML =
+    'BULL RUN x'+bullRun+' &middot; '+jackpots+' IPO'+(jackpots===1?'':'S')+' &middot; '+bumperHits+' TRADES<br>'+
+    '<span class="gold">BEST: $'+bestScore.toLocaleString()+'</span>';
+  const title=document.getElementById('over-title');
+  if(score>=bestScore && score>0){ title.textContent='NEW RECORD!'; }
+  else { title.textContent='MARKET CLOSED'; }
+  show('over-ov');
+  // qualify for leaderboard?
+  maybePromptName();
+  fetchLeaderboard().then(renderBoard);
+}
+
+// ---------- Physics: collision resolvers ----------
+function collideSeg(b, ax,ay,bx,by, e, kick, thick, surf){
+  const abx=bx-ax, aby=by-ay;
+  const L2=abx*abx+aby*aby || 1e-6;
+  let t=((b.x-ax)*abx+(b.y-ay)*aby)/L2; t=clamp(t,0,1);
+  const px=ax+abx*t, py=ay+aby*t;
+  let nx=b.x-px, ny=b.y-py;
+  let d=Math.hypot(nx,ny);
+  const R=b.r+(thick||0);
+  if(d>R) return false;
+  if(d<1e-4){ nx=-aby; ny=abx; d=Math.hypot(nx,ny)||1; }
+  nx/=d; ny/=d;
+  b.x+=nx*(R-d); b.y+=ny*(R-d);
+  let rvx=b.vx-(surf?surf.x:0), rvy=b.vy-(surf?surf.y:0);
+  const vn=rvx*nx+rvy*ny;
+  if(vn<0){ const j=-(1+e)*vn; b.vx+=j*nx; b.vy+=j*ny; }
+  if(kick){ b.vx+=nx*kick; b.vy+=ny*kick; }
+  return true;
+}
+function collideCircle(b, cx,cy,cr, e, kick){
+  let nx=b.x-cx, ny=b.y-cy; let d=Math.hypot(nx,ny); const R=b.r+cr;
+  if(d>R) return false;
+  if(d<1e-4){ nx=0; ny=-1; d=1; }
+  nx/=d; ny/=d;
+  b.x=cx+nx*R; b.y=cy+ny*R;
+  const vn=b.vx*nx+b.vy*ny;
+  if(vn<0){ const j=-(1+e)*vn; b.vx+=j*nx; b.vy+=j*ny; }
+  if(kick){ b.vx+=nx*kick; b.vy+=ny*kick; }
+  return true;
+}
+
+function collideFlipper(b,f){
+  const [tx,ty]=flipTip(f);
+  // closest point on pivot->tip segment
+  const abx=tx-f.px, aby=ty-f.py; const L2=abx*abx+aby*aby||1e-6;
+  let t=((b.x-f.px)*abx+(b.y-f.py)*aby)/L2; t=clamp(t,0,1);
+  const px=f.px+abx*t, py=f.py+aby*t;
+  let nx=b.x-px, ny=b.y-py; let d=Math.hypot(nx,ny);
+  const R=b.r+FLIP_THK;
+  if(d>R) return false;
+  if(d<1e-4){ nx=-aby; ny=abx; d=Math.hypot(nx,ny)||1; }
+  nx/=d; ny/=d;
+  b.x+=nx*(R-d); b.y+=ny*(R-d);
+  // surface velocity at contact = omega x r  (per-frame units)
+  const rx=px-f.px, ry=py-f.py;
+  const svx=-f.omega*ry, svy=f.omega*rx;
+  let rvx=b.vx-svx, rvy=b.vy-svy;
+  const vn=rvx*nx+rvy*ny;
+  if(vn<0){ const j=-(1+0.35)*vn; b.vx+=j*nx; b.vy+=j*ny; }
+  // extra snap when actively swinging up
+  if(Math.abs(f.omega)>0.05){
+    b.vx += svx*0.55; b.vy += svy*0.55;
+    f.flash = 1;
+  }
+  return true;
+}
+
+// ---------- Triggers (non-physical, position based) ----------
+function checkTriggers(b){
+  // DOW rollover lanes
+  for(const l of lanes){
+    if(!l.lit && b.x>l.x-l.w/2 && b.x<l.x+l.w/2 && b.y>l.y-l.h/2 && b.y<l.y+l.h/2){
+      l.lit=1; addScore(300*bullRun); sLane(); flash(l.ch, 'blue', 700);
+      if(lanes.every(x=>x.lit)){
+        bullRun=Math.min(bullRun+1,9); resetLanes();
+        addScore(2000*bullRun); sBull();
+        flash("BULL RUN  x"+bullRun+"!", 'gold', 1800); shake(4);
+      }
+    }
+  }
+  // IPO saucer capture
+  if(dist(b.x,b.y,saucer.x,saucer.y) < saucer.r){
+    if(jackpotLit){
+      addScore(20000*bullRun); jackpots++; jackpotLit=false;
+      sJack(); shake(7);
+      flash("IPO JACKPOT!  +$"+(20000*bullRun).toLocaleString(), 'gold', 2200);
+    } else {
+      addScore(1500*bullRun); sCoin();
+      flash("DIVIDEND  +$"+(1500*bullRun).toLocaleString(), 'ink', 1300);
+    }
+    // eject downward into play
+    b.x=saucer.x; b.y=saucer.y+saucer.r+b.r+2;
+    b.vx=rand(-2,2); b.vy=6.5;
+  }
+}
+
+// ---------- Main physics step ----------
+function physics(){
+  for(let bi=balls.length-1; bi>=0; bi--){
+    const b=balls[bi];
+    // clamp velocity
+    const sp=Math.hypot(b.vx,b.vy);
+    if(sp>MAXV){ b.vx=b.vx/sp*MAXV; b.vy=b.vy/sp*MAXV; }
+
+    if(state==='launch' && bi===0){
+      // ball sits on plunger in the lane
+      b.x=400; b.vx=0;
+      const restY = 770 - plunger*40;
+      b.y += (restY-b.y)*0.4;
+      b.vy=0;
+      // keep it in lane (walls handle sides)
+      b.trail.length=0;
+      continue;
+    }
+
+    for(let s=0;s<SUB;s++){
+      b.vy += GRAV/SUB;
+      b.x += b.vx/SUB;
+      b.y += b.vy/SUB;
+
+      for(const w of walls) collideSeg(b, w.ax,w.ay,w.bx,w.by, w.e, w.kick, 0, null);
+      for(const p of posts) collideCircle(b, p.x,p.y,p.r, 0.5, 0.4);
+      for(const bp of bumpers){
+        if(collideCircle(b, bp.x,bp.y,bp.r, 0.35, 5.6)){
+          bp.lit=1; bumperHits++; addScore(250*bullRun); sBump();
+        }
+      }
+      for(const t of targets){
+        if(!t.lit && collideCircle(b, t.x,t.y,t.r, 0.4, 1.5)){
+          t.lit=1; addScore(750*bullRun); sTarget(); flash(t.ch, 'gold', 700);
+          if(targets.every(x=>x.lit)) completeMoney();
+        } else if(t.lit){
+          collideCircle(b, t.x,t.y,t.r, 0.4, 0.5);
+        }
+      }
+      for(const f of flippers) collideFlipper(b,f);
+    }
+
+    b.vx*=DAMP; b.vy*=DAMP;
+
+    // trail
+    b.trail.push([b.x,b.y]); if(b.trail.length>7) b.trail.shift();
+
+    checkTriggers(b);
+
+    // slingshot flash detection (approx: near kick faces)
+    // drain check
+    if(b.y > DRAIN_Y && b.x < 384){
+      ballDrained(bi);
+      continue;
+    }
+    if(b.y > VH+40){ ballDrained(bi); continue; }
+  }
+}
+
+function completeMoney(){
+  resetTargets();
+  jackpotLit=true;
+  addScore(5000*bullRun);
+  flash("VAULT OPEN - SHOOT THE IPO!", 'gold', 2200);
+  sBull(); shake(4);
+  // reward multiball if space
+  if(!multiballActive && balls.length<3){
+    const add = Math.min(2, 3-balls.length);
+    for(let i=0;i<add;i++){
+      balls.push(newBall(206+rand(-30,30), 150, rand(-3,3), 5+rand(0,3)));
+    }
+    multiballActive=true;
+    flash("BULL MARKET MULTIBALL!", 'ink', 2400);
+    setTimeout(sJack,120);
+  }
+}
+
+// ---------- Flipper update ----------
+function updateFlippers(){
+  for(const f of flippers){
+    f.prev=f.angle;
+    const target = f.pressed ? f.active : f.rest;
+    const spd = 0.62;
+    if(f.angle<target) f.angle=Math.min(target,f.angle+spd);
+    else f.angle=Math.max(target,f.angle-spd);
+    f.omega=f.angle-f.prev;
+    if(f.flash>0) f.flash-=0.12;
+  }
+}
+
+// ---------- Rendering ----------
+function draw(){
+  const ts=now();
+  ctx.save();
+  // screen shake
+  if(ts<shakeT){ const s=shakeMag*((shakeT-ts)/220); ctx.translate(rand(-s,s),rand(-s,s)); }
+
+  // background playfield
+  ctx.fillStyle='#05060a'; ctx.fillRect(-20,-20,VW+40,VH+40);
+  drawPlayfieldBg();
+  drawWalls();
+  drawLanes();
+  drawSaucer(ts);
+  drawTargets(ts);
+  drawBumpers(ts);
+  drawPosts();
+  drawSlings(ts);
+  drawFlippers();
+  drawPlungerLane();
+  drawBalls(ts);
+  drawHUD(ts);
+  drawMessages(ts);
+  ctx.restore();
+}
+
+function neonLine(ax,ay,bx,by,color,w,glow){
+  ctx.save();
+  if(glow){ ctx.shadowColor=color; ctx.shadowBlur=glow; }
+  ctx.strokeStyle=color; ctx.lineWidth=w; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlayfieldBg(){
+  // faint grid + ticker "chart" line as decoration
+  ctx.save();
+  ctx.globalAlpha=0.5;
+  ctx.strokeStyle='rgba(0,255,136,0.05)'; ctx.lineWidth=1;
+  for(let y=120;y<800;y+=36){ ctx.beginPath(); ctx.moveTo(26,y); ctx.lineTo(414,y); ctx.stroke(); }
+  ctx.restore();
+  // "DOW JONES" big faded backglass wordmark mid-field
+  ctx.save();
+  ctx.globalAlpha=0.10; ctx.textAlign='center'; ctx.fillStyle='#ffcc22';
+  ctx.font='bold 30px Courier New';
+  ctx.fillText('DOW JONES', 220, 400);
+  ctx.font='bold 15px Courier New';
+  ctx.fillText('WALL ST', 220, 560);
+  ctx.restore();
+  // decorative jagged "stock chart" going up
+  ctx.save();
+  ctx.globalAlpha=0.14; ctx.strokeStyle='#00ff88'; ctx.lineWidth=2;
+  ctx.beginPath();
+  const pts=[[60,620],[95,600],[120,615],[150,585],[185,595],[215,560],[250,575],[285,540],[320,555],[360,520]];
+  ctx.moveTo(pts[0][0],pts[0][1]); pts.forEach(p=>ctx.lineTo(p[0],p[1])); ctx.stroke();
+  ctx.restore();
+}
+
+function drawWalls(){
+  for(let i=0;i<walls.length;i++){
+    const w=walls[i];
+    let col='#0d6b45';
+    // slings drawn separately (skip their 3 faces)
+    neonLine(w.ax,w.ay,w.bx,w.by,col,4,6);
+    neonLine(w.ax,w.ay,w.bx,w.by,'#00ff88',1.4,0);
+  }
+}
+
+function drawLanes(){
+  for(const l of lanes){
+    const col = l.lit ? '#33ccff' : '#124a5a';
+    ctx.save();
+    ctx.globalAlpha = l.lit?1:0.5;
+    ctx.strokeStyle=col; ctx.lineWidth=2;
+    ctx.strokeRect(l.x-l.w/2, l.y-l.h/2, l.w, l.h);
+    ctx.fillStyle=col; ctx.font='bold 14px Courier New'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(l.lit){ ctx.shadowColor=col; ctx.shadowBlur=8; }
+    ctx.fillText(l.ch, l.x, l.y);
+    ctx.restore();
+  }
+  // "DOW" caption
+  ctx.save(); ctx.fillStyle='#124a5a'; ctx.font='9px Courier New'; ctx.textAlign='center';
+  ctx.fillText('ROLL THE DOW', 206, 200); ctx.restore();
+}
+
+function drawSaucer(ts){
+  const lit=jackpotLit;
+  const pulse=lit? (0.6+0.4*Math.sin(ts/120)) : 0.4;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(saucer.x,saucer.y,saucer.r,0,7);
+  ctx.fillStyle = lit? 'rgba(255,204,34,'+ (0.25*pulse) +')' : 'rgba(50,80,70,0.25)';
+  ctx.fill();
+  ctx.lineWidth=2; ctx.strokeStyle = lit? '#ffcc22':'#2a6a52';
+  if(lit){ ctx.shadowColor='#ffcc22'; ctx.shadowBlur=14*pulse; }
+  ctx.stroke();
+  ctx.fillStyle= lit? '#ffcc22':'#3a7a58'; ctx.font='bold 10px Courier New';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('IPO', saucer.x, saucer.y);
+  ctx.restore();
+}
+
+function drawTargets(ts){
+  // caption
+  ctx.save(); ctx.fillStyle='#a8791a'; ctx.font='9px Courier New'; ctx.textAlign='center';
+  ctx.fillText('SPELL MONEY - OPEN THE VAULT', 206, 442); ctx.restore();
+  for(const t of targets){
+    const col = t.lit ? '#ffcc22' : '#5a4413';
+    ctx.save();
+    ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,7);
+    if(t.lit){ ctx.shadowColor='#ffcc22'; ctx.shadowBlur=10; }
+    ctx.fillStyle = t.lit ? 'rgba(255,204,34,0.18)':'#0a0d0b';
+    ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=col; ctx.stroke();
+    ctx.fillStyle=col; ctx.font='bold 13px Courier New'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(t.ch, t.x, t.y);
+    ctx.restore();
+  }
+}
+
+function drawBumpers(ts){
+  for(const b of bumpers){
+    if(b.lit>0) b.lit-=0.06;
+    const glow=b.lit>0;
+    ctx.save();
+    // outer ring
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,7);
+    ctx.fillStyle= glow? 'rgba(0,255,136,'+(0.25+0.4*b.lit)+')' : 'rgba(0,60,40,0.5)';
+    if(glow){ ctx.shadowColor='#00ff88'; ctx.shadowBlur=18*Math.max(b.lit,0.2); }
+    ctx.fill();
+    ctx.lineWidth=3; ctx.strokeStyle= glow? '#7dffc0':'#0d8a5a'; ctx.stroke();
+    // inner
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*0.55,0,7);
+    ctx.fillStyle= glow? '#eafff4':'#083a26'; ctx.fill();
+    ctx.fillStyle= glow? '#053':'#00ff88'; ctx.font='bold 16px Courier New';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('$', b.x, b.y+1);
+    ctx.restore();
+  }
+  // caption
+  ctx.save(); ctx.fillStyle='#0d8a5a'; ctx.font='9px Courier New'; ctx.textAlign='center';
+  ctx.fillText('BULL BUMPERS', 206, 300); ctx.restore();
+}
+
+function drawPosts(){
+  for(const p of posts){
+    ctx.save(); ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7);
+    ctx.fillStyle='#0d3a28'; ctx.fill();
+    ctx.lineWidth=1.4; ctx.strokeStyle='#12664a'; ctx.stroke(); ctx.restore();
+  }
+}
+
+function drawSlings(ts){
+  // left sling triangle
+  drawSlingTri([80,636],[80,724],[140,700], walls[LEFT_SLING].flash);
+  drawSlingTri([332,636],[332,724],[272,700], walls[RIGHT_SLING].flash);
+}
+function drawSlingTri(a,b,c,flash){
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.closePath();
+  ctx.fillStyle='rgba(0,90,60,0.35)'; ctx.fill();
+  ctx.lineWidth=2.5; ctx.strokeStyle= (flash>0)?'#eafff4':'#12a06c';
+  if(flash>0){ ctx.shadowColor='#00ff88'; ctx.shadowBlur=14; }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawFlippers(){
+  for(const f of flippers){
+    if(f.flash>0) f.flash-=0.1;
+    const [tx,ty]=flipTip(f);
+    const hot = f.pressed || f.flash>0;
+    neonLine(f.px,f.py,tx,ty, hot?'#ffe680':'#0e7a4f', FLIP_THK*2, hot?14:6);
+    neonLine(f.px,f.py,tx,ty, hot?'#fff6c9':'#39d98c', FLIP_THK, 0);
+    // pivot cap
+    ctx.save(); ctx.beginPath(); ctx.arc(f.px,f.py,5,0,7);
+    ctx.fillStyle='#ffcc22'; ctx.fill(); ctx.restore();
+  }
+}
+
+function drawPlungerLane(){
+  // plunger meter at bottom of lane
+  const x=400, top=690, bot=792;
+  ctx.save();
+  ctx.strokeStyle='#0d3a28'; ctx.lineWidth=1;
+  ctx.strokeRect(x-8, top, 16, bot-top);
+  if(state==='launch'){
+    const h=(bot-top)*plunger;
+    ctx.fillStyle= plunger>0.85?'#ff4466':'#ffcc22';
+    ctx.fillRect(x-6, bot-h, 12, h);
+    // prompt
+    ctx.fillStyle='#5fd7a0'; ctx.font='9px Courier New'; ctx.textAlign='center';
+    ctx.save(); ctx.translate(x+18, 740); ctx.rotate(-Math.PI/2);
+    ctx.fillText('PULL & RELEASE', 0,0); ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawBalls(ts){
+  for(const b of balls){
+    // trail
+    for(let i=0;i<b.trail.length;i++){
+      const p=b.trail[i]; const a=(i/b.trail.length)*0.4;
+      ctx.save(); ctx.globalAlpha=a; ctx.beginPath();
+      ctx.arc(p[0],p[1],b.r*(0.4+0.5*i/b.trail.length),0,7);
+      ctx.fillStyle='#ffcc22'; ctx.fill(); ctx.restore();
+    }
+    // coin
+    ctx.save();
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,7);
+    const g=ctx.createRadialGradient(b.x-3,b.y-4,1,b.x,b.y,b.r);
+    g.addColorStop(0,'#fff7d0'); g.addColorStop(0.5,'#ffcc22'); g.addColorStop(1,'#a8791a');
+    ctx.fillStyle=g; ctx.shadowColor='#ffcc22'; ctx.shadowBlur=10; ctx.fill();
+    ctx.shadowBlur=0; ctx.lineWidth=1.5; ctx.strokeStyle='#7a560f'; ctx.stroke();
+    ctx.fillStyle='#7a560f'; ctx.font='bold 12px Courier New'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('$', b.x, b.y+1);
+    ctx.restore();
+  }
+}
+
+function drawHUD(ts){
+  // top ticker bar
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,VW,44);
+  ctx.strokeStyle='#0d6b45'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,44); ctx.lineTo(VW,44); ctx.stroke();
+  // score
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#3a7a58'; ctx.font='8px Courier New'; ctx.fillText('DJIA PORTFOLIO', 12, 14);
+  ctx.fillStyle='#ffcc22'; ctx.font='bold 22px Courier New';
+  ctx.shadowColor='#ffcc22'; ctx.shadowBlur=8;
+  ctx.fillText('$'+score.toLocaleString(), 12, 37);
+  ctx.shadowBlur=0;
+  // multiplier
+  ctx.textAlign='right';
+  ctx.fillStyle='#33ccff'; ctx.font='bold 15px Courier New';
+  ctx.fillText('BULL x'+bullRun, VW-12, 20);
+  // balls left as coins
+  ctx.fillStyle='#3a7a58'; ctx.font='8px Courier New'; ctx.fillText('BALLS', VW-12, 33);
+  for(let i=0;i<ballsLeft;i++){
+    ctx.beginPath(); ctx.arc(VW-18-i*13, 39, 4.5, 0, 7);
+    ctx.fillStyle='#ffcc22'; ctx.fill();
+  }
+  ctx.restore();
+  // vault-open indicator
+  if(jackpotLit){
+    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#ffcc22';
+    ctx.font='bold 10px Courier New'; ctx.globalAlpha=0.6+0.4*Math.sin(ts/120);
+    ctx.fillText('>> IPO JACKPOT IS LIT <<', 206, 100); ctx.restore();
+  }
+  // ball-save indicator
+  if(state==='play' && now()<ballSaveUntil){
+    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#33ccff';
+    ctx.font='9px Courier New'; ctx.globalAlpha=0.5+0.5*Math.sin(ts/100);
+    ctx.fillText('BALL SAVE ACTIVE', 206, VH-14); ctx.restore();
+  }
+}
+
+function drawMessages(ts){
+  const active=messages.filter(m=>m.until>ts);
+  messages=active;
+  const colors={ink:'#00ff88',gold:'#ffcc22',red:'#ff4466',blue:'#33ccff'};
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+  let y=VH*0.42;
+  active.slice(-3).forEach((m)=>{
+    const life=(m.until-ts);
+    const a=clamp(life/300,0,1);
+    ctx.globalAlpha=a; ctx.fillStyle=colors[m.color]||'#00ff88';
+    ctx.font='bold 17px Courier New';
+    ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=10;
+    ctx.fillText(m.text, 220, y); y+=26;
+  });
+  ctx.restore();
+}
+
+// ---------- Main loop ----------
+let lastFrame=0;
+function loop(t){
+  requestAnimationFrame(loop);
+  updateFlippers();
+  if(state==='play' || state==='launch' || state==='drain'){
+    physics();
+  }
+  draw();
+}
+requestAnimationFrame(loop);
+
+// ---------- Input ----------
+function pressFlip(side,down){
+  if(side<0){ flipL.pressed=down; } else { flipR.pressed=down; }
+  if(down){ sFlip(); ensureAudio(); }
+}
+
+// Keyboard
+const keyMap={};
+window.addEventListener('keydown',e=>{
+  if(keyMap[e.code]) return; keyMap[e.code]=true;
+  if(state==='start'){ if(e.code==='Space'||e.code==='Enter'){ startGame(); e.preventDefault(); return; } }
+  if(state==='over'){ if(e.code==='Enter'){ if(!isOverlay('name-ov')) startGame(); } }
+  if(e.code==='ArrowLeft'||e.code==='KeyA'||e.code==='KeyZ'){ pressFlip(-1,true); e.preventDefault(); }
+  if(e.code==='ArrowRight'||e.code==='KeyD'||e.code==='KeyM'||e.code==='Slash'){ pressFlip(1,true); e.preventDefault(); }
+  if(e.code==='Space'||e.code==='ArrowDown'){
+    if(state==='launch'){ charging=true; } e.preventDefault();
+  }
+});
+window.addEventListener('keyup',e=>{
+  keyMap[e.code]=false;
+  if(e.code==='ArrowLeft'||e.code==='KeyA'||e.code==='KeyZ'){ pressFlip(-1,false); }
+  if(e.code==='ArrowRight'||e.code==='KeyD'||e.code==='KeyM'||e.code==='Slash'){ pressFlip(1,false); }
+  if(e.code==='Space'||e.code==='ArrowDown'){
+    if(state==='launch' && charging){ charging=false; launchBall(); }
+  }
+});
+
+// Touch / pointer: left half = left flipper, right half = right flipper.
+// During launch, any touch charges the plunger; release launches.
+const activePointers={};
+function pointerDown(x,y,id){
+  ensureAudio();
+  if(state==='start' || state==='over') return; // handled by buttons
+  if(state==='launch'){ charging=true; activePointers[id]='plunge'; return; }
+  const side = (x < window.innerWidth/2) ? -1 : 1;
+  activePointers[id]=side;
+  pressFlip(side,true);
+}
+function pointerUp(id){
+  const v=activePointers[id]; delete activePointers[id];
+  if(v==='plunge'){ if(state==='launch' && charging){ charging=false; launchBall(); } return; }
+  if(v===-1||v===1){
+    // release flipper only if no other pointer holds that side
+    const stillHeld=Object.values(activePointers).includes(v);
+    if(!stillHeld) pressFlip(v,false);
+  }
+}
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches) pointerDown(t.clientX,t.clientY,t.identifier);
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches) pointerUp(t.identifier);
+},{passive:false});
+canvas.addEventListener('touchcancel',e=>{
+  for(const t of e.changedTouches) pointerUp(t.identifier);
+},{passive:false});
+// Mouse fallback (desktop testing)
+let mouseDown=false;
+canvas.addEventListener('mousedown',e=>{ mouseDown=true; pointerDown(e.clientX,e.clientY,'mouse'); });
+window.addEventListener('mouseup',e=>{ if(mouseDown){ mouseDown=false; pointerUp('mouse'); } });
+
+// charge the plunger over time while held
+setInterval(()=>{ if(state==='launch' && charging){ plunger=clamp(plunger+0.04,0,1); } }, 16);
+
+// ---------- Overlay helpers ----------
+function show(id){ document.getElementById(id).classList.add('show'); }
+function hide(id){ document.getElementById(id).classList.remove('show'); }
+function isOverlay(id){ return document.getElementById(id).classList.contains('show'); }
+
+document.getElementById('start-btn').addEventListener('click',()=>{ ensureAudio(); startGame(); });
+document.getElementById('over-btn').addEventListener('click',()=>{ startGame(); });
+
+// ===================================================================
+// LEADERBOARD  (matches /api/scores pattern used by hoarder-patrol)
+// ===================================================================
+const LB_API='/api/scores';
+const GAME_ID='dow-jones-pinball';
+let leaderboard=[];
+let leaderboardLoaded=false;
+let playerName=(()=>{try{return localStorage.getItem('arcadeName')||''}catch{return''}})();
+let scoreSubmitted=false;
+
+async function fetchLeaderboard(){
+  try{
+    const r=await fetch(`${LB_API}?game=${GAME_ID}&limit=10`,{cache:'no-store'});
+    if(!r.ok) throw 0;
+    const j=await r.json();
+    leaderboard=Array.isArray(j.scores)?j.scores:[];
+  }catch{ leaderboard=[]; }
+  leaderboardLoaded=true;
+  return leaderboard;
+}
+async function submitScore(name,sc,lvl,jp){
+  const r=await fetch(LB_API,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({game:GAME_ID,name,score:sc,wave:lvl,killed:jp})});
+  if(!r.ok){ let detail=''; try{detail=(await r.json()).error||''}catch{}; throw new Error(detail||('HTTP '+r.status)); }
+  await fetchLeaderboard();
+}
+function qualifies(){
+  if(score<=0) return false;
+  if(leaderboard.length<10) return true;
+  return score > (leaderboard[leaderboard.length-1].score||0);
+}
+async function maybePromptName(){
+  scoreSubmitted=false;
+  await fetchLeaderboard();
+  if(!qualifies()) { renderBoard(); return; }
+  // show name entry on top of gameover
+  const inp=document.getElementById('ne-input');
+  inp.value=playerName.slice(0,16);
+  document.getElementById('ne-score').textContent='$'+score.toLocaleString();
+  document.getElementById('ne-status').textContent='';
+  show('name-ov');
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 80);
+}
+function renderBoard(){
+  const wrap=document.getElementById('board-wrap');
+  if(!leaderboardLoaded){ wrap.innerHTML='<div class="loading">loading leaderboard...</div>'; return; }
+  if(leaderboard.length===0){ wrap.innerHTML='<div class="loading">be the first to make the board</div>'; return; }
+  let html='';
+  leaderboard.slice(0,10).forEach((row,i)=>{
+    const me=(scoreSubmitted && row.name===playerName && row.score===score);
+    html+=`<div class="row${me?' me':''}"><span class="rank">${String(i+1).padStart(2,'0')}</span>`+
+          `<span class="nm">${escapeHtml(row.name||'ANON')}</span>`+
+          `<span class="sc">$${Number(row.score||0).toLocaleString()}</span></div>`;
+  });
+  wrap.innerHTML=html;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// name form
+document.getElementById('ne-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const inp=document.getElementById('ne-input');
+  const status=document.getElementById('ne-status');
+  const btn=e.target.querySelector('button[type=submit]');
+  const cleaned=(inp.value||'').toUpperCase().replace(/[^A-Z0-9 \-_]/g,'').trim().slice(0,16);
+  const name=cleaned||'ANON';
+  playerName=name; try{localStorage.setItem('arcadeName',name)}catch{}
+  btn.disabled=true; btn.textContent='SAVING...'; status.textContent='';
+  try{
+    await submitScore(name,score,bullRun,jackpots);
+    scoreSubmitted=true; hide('name-ov'); renderBoard();
+  }catch(err){
+    status.textContent='Could not save (offline?). Try again or skip.';
+    btn.disabled=false; btn.textContent='SUBMIT';
+  }
+});
+document.querySelector('#name-ov .skip').addEventListener('click',()=>{ hide('name-ov'); renderBoard(); });
+
+// warm the board
+fetchLeaderboard();
+</script>
+</body>
+</html>
