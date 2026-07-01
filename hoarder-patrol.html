@@ -16,16 +16,19 @@
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;}
 body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:var(--app-height);font-family:monospace;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));}
 canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action:none;}
-#btns{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;width:100%;max-width:480px;touch-action:none;}
+/* Three clusters spread across the bottom band with real gaps between them
+   so an active thumb on SHOOT can't clip NUKE/SHOVEL/PAUSE by accident:
+   joystick (far left) -- NUKE/SHOVEL/PAUSE (middle) -- SHOOT (far right, isolated). */
+#btns{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:8px;width:100%;max-width:480px;touch-action:none;}
 #btns button{background:#111;color:#0f0;border:1px solid #0f0;font-family:monospace;font-size:14px;border-radius:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;display:flex;align-items:center;justify-content:center;padding:0;}
-#joyzone{width:118px;height:118px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;touch-action:none;}
-#joy-base{position:relative;width:110px;height:110px;border-radius:50%;border:2px solid #0f0;background:rgba(0,40,10,0.25);touch-action:none;}
-#joy-knob{position:absolute;width:46px;height:46px;border-radius:50%;background:#0f0;opacity:.55;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 10px rgba(0,255,0,.5);transition:opacity .15s;}
-#actions{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;}
-#actions-row{display:flex;gap:5px;}
-#bshoot{width:74px;height:50px;font-size:12px;letter-spacing:1px;}
-#bnuke,#bshovel{width:56px;height:42px;font-size:9px;letter-spacing:.5px;}
-#bpause{width:74px;height:28px;font-size:8px!important;line-height:1.1;}
+#joyzone{width:104px;height:104px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;touch-action:none;}
+#joy-base{position:relative;width:96px;height:96px;border-radius:50%;border:2px solid #0f0;background:rgba(0,40,10,0.25);touch-action:none;}
+#joy-knob{position:absolute;width:40px;height:40px;border-radius:50%;background:#0f0;opacity:.55;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 10px rgba(0,255,0,.5);transition:opacity .15s;}
+#midactions{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;}
+#midactions-row{display:flex;gap:6px;}
+#bnuke,#bshovel{width:50px;height:46px;font-size:9px;letter-spacing:.5px;}
+#bpause{width:106px;height:28px;font-size:8px!important;line-height:1.1;}
+#bshoot{width:78px;height:58px;font-size:13px;letter-spacing:1px;flex:0 0 auto;}
 #bnuke{background:#1a0800!important;color:#ff6600!important;border:2px solid #ff6600!important;}
 #bshovel{background:#1a0f00!important;color:#c8a060!important;border:2px solid #8b6914!important;}
 #bshoot{color:#ff0!important;border-color:#ff0!important;}
@@ -63,14 +66,14 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action
       <div id="joy-knob"></div>
     </div>
   </div>
-  <div id="actions">
-    <button id="bshoot">&#9679; SHOOT</button>
-    <div id="actions-row">
+  <div id="midactions">
+    <div id="midactions-row">
       <button id="bnuke">&#9762; NUKE</button>
       <button id="bshovel">SHOVEL</button>
     </div>
     <button id="bpause">BATHROOM BREAK</button>
   </div>
+  <button id="bshoot">&#9679; SHOOT</button>
 </div>
 <div id="hint">Move: WASD/arrows &middot; Shoot: SPACE &middot; Nuke: N &middot; Shovel: X (near house) &middot; Pause: P</div>
 
@@ -1123,8 +1126,13 @@ function draw(){
       ctx.globalAlpha=1;
       clutter=_c;shovelMode=_sm;effects=_ef;person=_p;pMoving=_pm;pframe=_pf;
     }
-    const ty=128;
-    ctx.font='bold 48px monospace';
+    // Bigger title + generously spaced-out title-screen text block. All
+    // y-offsets below are measured (via ctx.measureText / manual layout) to
+    // stay clear of the little live-demo scene that starts around y=345 and
+    // the HI score line pinned near the bottom, so nothing overlaps or gets
+    // clipped inside the fixed 620x500 canvas at any display scale.
+    const ty=112;
+    ctx.font='bold 60px monospace';
     ctx.globalAlpha=.1;FC('#ff1133');ctx.fillText('HOARDER PATROL',W/2-3,ty);
     FC('#1133ff');ctx.fillText('HOARDER PATROL',W/2+3,ty);ctx.globalAlpha=1;
     [{b:40,a:.08},{b:22,a:.2},{b:10,a:.5},{b:3,a:.85},{b:0,a:1}].forEach(({b,a})=>{
@@ -1135,25 +1143,25 @@ function draw(){
     if(Math.random()<.035){ctx.globalAlpha=.07;FC('#fff');ctx.fillText('HOARDER PATROL',W/2,ty);ctx.globalAlpha=1;}
 
     SC('rgba(0,255,100,0.3)');LW(1.5);
-    BL();ML(W/2-210,ty+10);LL(W/2-38,ty+10);STR();
-    BL();ML(W/2+38,ty+10);LL(W/2+210,ty+10);STR();
+    BL();ML(W/2-262,ty+12);LL(W/2-48,ty+12);STR();
+    BL();ML(W/2+48,ty+12);LL(W/2+262,ty+12);STR();
     const diam=(cx,cy,r)=>{BL();ML(cx,cy-r);LL(cx+r,cy);LL(cx,cy+r);LL(cx-r,cy);ctx.closePath();STR();};
-    diam(W/2-32,ty+10,4);diam(W/2+32,ty+10,4);
-    const bx1=W/2-218,bx2=W/2+218,by1=ty-42,by2=ty+16,bl=14;
+    diam(W/2-40,ty+12,4);diam(W/2+40,ty+12,4);
+    const bx1=W/2-272,bx2=W/2+272,by1=ty-54,by2=ty+18,bl=16;
     [[bx1,by1,1,1],[bx2,by1,-1,1],[bx1,by2,1,-1],[bx2,by2,-1,-1]].forEach(([x,y,sx,sy])=>{
       SC('rgba(0,255,100,0.35)');LW(1.5);BL();ML(x+sx*bl,y);LL(x,y);LL(x,y+sy*bl);STR();
     });
 
-    ctx.font='12px monospace';FC('rgba(0,190,80,.6)');
-    ctx.fillText('defend the house  *  shoot junk  *  earn patrol badges',W/2,ty+52);
+    ctx.font='13px monospace';FC('rgba(0,190,80,.6)');
+    ctx.fillText('defend the house  *  shoot junk  *  earn patrol badges',W/2,ty+68);
     ctx.font='10px monospace';FC('rgba(60,110,60,.45)');
-    ctx.fillText('WASD / arrows: move  *  SPACE: shoot  *  N: nuke  *  X: shovel  *  P: pause',W/2,ty+68);
-    ctx.fillText('kill hoarders for shovels  *  chain reactions  *  boss every 5 levels',W/2,ty+82);
+    ctx.fillText('WASD / arrows: move  *  SPACE: shoot  *  N: nuke  *  X: shovel  *  P: pause',W/2,ty+94);
+    ctx.fillText('kill hoarders for shovels  *  chain reactions  *  boss every 5 levels',W/2,ty+110);
 
     if(Math.floor(now/520)%2===0){
       ctx.shadowBlur=18;ctx.shadowColor='#ffff00';
       ctx.font='bold 18px monospace';FC('#ffee00');
-      ctx.fillText('>>  PRESS SPACE/ENTER OR TAP TO START  <<',W/2,ty+118);
+      ctx.fillText('>>  PRESS SPACE/ENTER OR TAP TO START  <<',W/2,ty+158);
       ctx.shadowBlur=0;
     }
 
