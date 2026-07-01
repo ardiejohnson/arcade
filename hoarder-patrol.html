@@ -16,22 +16,33 @@
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;}
 body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:var(--app-height);font-family:monospace;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));}
 canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action:none;}
-/* Three clusters spread across the bottom band with real gaps between them
-   so an active thumb on SHOOT can't clip NUKE/SHOVEL/PAUSE by accident:
-   joystick (far left) -- NUKE/SHOVEL/PAUSE (middle) -- SHOOT (far right, isolated). */
+/* Big readable SCORE / HI readout in the empty band above the canvas.
+   margin-top gives a fixed clearance below the fixed ARCADE/ARDIEJOHNSON.COM
+   corner links regardless of how much (or little) slack the vertical
+   centering leaves, so it can never collide with them on any viewport. */
+#hud{display:flex;gap:34px;align-items:center;justify-content:center;margin-top:40px;margin-bottom:2px;flex:0 0 auto;}
+.hud-block{display:flex;flex-direction:column;align-items:center;line-height:1.15;}
+.hud-lbl{font-size:12px;letter-spacing:2px;color:#0f0;opacity:.65;}
+.hud-val{font-size:34px;font-weight:bold;color:#00ff88;text-shadow:0 0 12px rgba(0,255,136,.55);}
+.hud-hi .hud-lbl{color:#ffdd66;opacity:.7;}
+.hud-hi .hud-val{font-size:26px;color:#ffdd66;text-shadow:0 0 12px rgba(255,221,102,.5);}
+/* Three clusters spread across the main control band so an active thumb on
+   SHOOT can't clip NUKE/SHOVEL by accident: joystick (far left) --
+   NUKE/SHOVEL (middle) -- SHOOT (far right, isolated). BATHROOM BREAK/pause
+   lives in its own big centered row below, well clear of all three. */
 #btns{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:8px;width:100%;max-width:480px;touch-action:none;}
-#btns button{background:#111;color:#0f0;border:1px solid #0f0;font-family:monospace;font-size:14px;border-radius:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;display:flex;align-items:center;justify-content:center;padding:0;}
+#btns button,#pausezone button{background:#111;color:#0f0;border:1px solid #0f0;font-family:monospace;font-size:14px;border-radius:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;display:flex;align-items:center;justify-content:center;padding:0;}
 #joyzone{width:104px;height:104px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;touch-action:none;}
 #joy-base{position:relative;width:96px;height:96px;border-radius:50%;border:2px solid #0f0;background:rgba(0,40,10,0.25);touch-action:none;}
 #joy-knob{position:absolute;width:40px;height:40px;border-radius:50%;background:#0f0;opacity:.55;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 10px rgba(0,255,0,.5);transition:opacity .15s;}
-#midactions{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto;}
-#midactions-row{display:flex;gap:6px;}
+#midactions{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
 #bnuke,#bshovel{width:50px;height:46px;font-size:9px;letter-spacing:.5px;}
-#bpause{width:106px;height:28px;font-size:8px!important;line-height:1.1;}
 #bshoot{width:78px;height:58px;font-size:13px;letter-spacing:1px;flex:0 0 auto;}
 #bnuke{background:#1a0800!important;color:#ff6600!important;border:2px solid #ff6600!important;}
 #bshovel{background:#1a0f00!important;color:#c8a060!important;border:2px solid #8b6914!important;}
 #bshoot{color:#ff0!important;border-color:#ff0!important;}
+#pausezone{width:100%;max-width:480px;display:flex;justify-content:center;margin-top:10px;flex:0 0 auto;touch-action:none;}
+#bpause{width:min(280px,80%);height:64px;font-size:19px!important;letter-spacing:1.5px;line-height:1.15;border-radius:12px;font-weight:bold;}
 #bpause{color:#88aaff!important;border-color:#446688!important;}
 #hint{color:#333;font-size:10px;margin-top:4px;text-align:center;}
 #back{position:fixed;top:10px;left:10px;color:#666;font-family:monospace;font-size:11px;text-decoration:none;border:1px solid #333;padding:4px 8px;border-radius:3px;z-index:5;}
@@ -59,6 +70,10 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action
 <body>
 <a id="back" href="/">&larr; ARCADE</a>
 <a id="home" href="https://ardiejohnson.com">ARDIEJOHNSON.COM &#8599;</a>
+<div id="hud">
+  <div class="hud-block"><span class="hud-lbl">SCORE</span><span class="hud-val" id="hud-score-val">0</span></div>
+  <div class="hud-block hud-hi"><span class="hud-lbl">HI</span><span class="hud-val" id="hud-hi-val">0</span></div>
+</div>
 <canvas id="c"></canvas>
 <div id="btns">
   <div id="joyzone">
@@ -67,13 +82,13 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action
     </div>
   </div>
   <div id="midactions">
-    <div id="midactions-row">
-      <button id="bnuke">&#9762; NUKE</button>
-      <button id="bshovel">SHOVEL</button>
-    </div>
-    <button id="bpause">BATHROOM BREAK</button>
+    <button id="bnuke">&#9762; NUKE</button>
+    <button id="bshovel">SHOVEL</button>
   </div>
   <button id="bshoot">&#9679; SHOOT</button>
+</div>
+<div id="pausezone">
+  <button id="bpause">BATHROOM BREAK</button>
 </div>
 <div id="hint">Move: WASD/arrows &middot; Shoot: SPACE &middot; Nuke: N &middot; Shovel: X (near house) &middot; Pause: P</div>
 
@@ -112,14 +127,23 @@ function syncAppHeight(){
   document.documentElement.style.setProperty('--app-height',h+'px');
 }
 
+// Full outer height (content box + its own margins) of a flex sibling, so the
+// reserve calc below stays accurate no matter how many rows sit above/below
+// the canvas (HUD, control band, pause row, hint text).
+function blockHeight(el){
+  if(!el)return 0;
+  const s=getComputedStyle(el);
+  return el.offsetHeight+(parseFloat(s.marginTop)||0)+(parseFloat(s.marginBottom)||0);
+}
 function resizeCanvas(){
   syncAppHeight();
-  const btns=document.getElementById('btns'),hint=document.getElementById('hint');
+  const hud=document.getElementById('hud'),btns=document.getElementById('btns'),
+        pausezone=document.getElementById('pausezone'),hint=document.getElementById('hint');
   const bs=getComputedStyle(document.body);
   const padX=(parseFloat(bs.paddingLeft)||0)+(parseFloat(bs.paddingRight)||0);
   const padY=(parseFloat(bs.paddingTop)||0)+(parseFloat(bs.paddingBottom)||0);
   const{w:vw,h:vh}=viewportSize();
-  const reserve=(btns?btns.offsetHeight:0)+(hint?hint.offsetHeight:0)+padY+20;
+  const reserve=blockHeight(hud)+blockHeight(btns)+blockHeight(pausezone)+blockHeight(hint)+padY+8;
   const availW=Math.max(240,vw-padX);
   const availH=Math.max(200,vh-reserve);
   const aspect=W/H;
@@ -993,7 +1017,17 @@ function dBadgesGameOver(){
   if(badgesEarned.length>7){FC('#444');ctx.font='9px monospace';ctx.fillText('+'+(badgesEarned.length-7)+' more',cx,yTop+16+7*12);}
 }
 
+// Big SCORE/HI readout now lives in the HTML #hud bar above the canvas
+// (crisp, large text) instead of the small on-canvas text. Keeps in sync
+// every frame; only touches the DOM when the displayed value actually changes.
+const hudScoreEl=document.getElementById('hud-score-val'),hudHiEl=document.getElementById('hud-hi-val');
+function syncHud(){
+  const s=String(score||0),h=String(hiScore||0);
+  if(hudScoreEl&&hudScoreEl.textContent!==s)hudScoreEl.textContent=s;
+  if(hudHiEl&&hudHiEl.textContent!==h)hudHiEl.textContent=h;
+}
 function draw(){
+  syncHud();
   FC('rgba(0,0,0,0.22)');ctx.fillRect(0,0,W,H);
   if(gameState==='title'){
     const now=Date.now();
@@ -1263,8 +1297,8 @@ function draw(){
   if(nukeFlash>0){ctx.fillStyle=`rgba(255,220,50,${(nukeFlash/28)*.7})`;ctx.fillRect(0,0,W,H);}
   if(gsAnnounce>0){ctx.textAlign='center';ctx.font='bold 20px monospace';FC(Math.floor(Date.now()/300)%2?'#ffdd00':'#ff8800');ctx.fillText('GARAGE SALE!  Items slowed!',W/2,H/2);}
   dBadge();
-  ctx.textAlign='left';ctx.font='bold 14px monospace';FC('#00ff88');ctx.fillText('SCORE '+score,8,20);
-  ctx.textAlign='right';ctx.fillText('HI '+hiScore,W-8,20);
+  // SCORE / HI now render big in the HTML #hud bar above the canvas (see
+  // syncHud()) instead of duplicating small text here.
   const m=getMult();if(combo>=3){ctx.textAlign='center';ctx.font='bold 15px monospace';FC(Math.floor(Date.now()/200)%2?'#ff8800':'#ffdd00');ctx.fillText('x'+m+' COMBO!',W/2,22);}
   dLevelBar();
   ctx.textAlign='center';ctx.font='bold 15px monospace';
