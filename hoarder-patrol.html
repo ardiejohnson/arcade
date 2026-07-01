@@ -6,22 +6,26 @@
 <title>HOARDER PATROL</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
+/* --app-height is kept in sync with window.visualViewport by JS below so the
+   layout always matches the space actually visible between mobile browser
+   toolbars (100vh is the LARGE viewport and overflows off-screen when the
+   address/nav bars are showing). @supports upgrades the static fallback to
+   the dynamic viewport unit; JS then overrides with an exact px value. */
+:root{--app-height:100vh;}
+@supports (height:100dvh){:root{--app-height:100dvh;}}
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;}
-body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:100vh;font-family:monospace;padding:8px;padding-bottom:max(10px,env(safe-area-inset-bottom));}
+body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:var(--app-height);font-family:monospace;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));}
 canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action:none;}
-#btns{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-top:8px;width:100%;max-width:520px;touch-action:none;}
+#btns{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;width:100%;max-width:480px;touch-action:none;}
 #btns button{background:#111;color:#0f0;border:1px solid #0f0;font-family:monospace;font-size:14px;border-radius:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;display:flex;align-items:center;justify-content:center;padding:0;}
-#dpad{display:grid;grid-template-columns:repeat(3,50px);grid-template-rows:repeat(3,50px);gap:4px;flex:0 0 auto;}
-#dpad button{width:50px;height:50px;font-size:20px;}
-#bup{grid-column:2;grid-row:1;}
-#bleft{grid-column:1;grid-row:2;}
-#bright{grid-column:3;grid-row:2;}
-#bdown{grid-column:2;grid-row:3;}
+#joyzone{width:118px;height:118px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;touch-action:none;}
+#joy-base{position:relative;width:110px;height:110px;border-radius:50%;border:2px solid #0f0;background:rgba(0,40,10,0.25);touch-action:none;}
+#joy-knob{position:absolute;width:46px;height:46px;border-radius:50%;background:#0f0;opacity:.55;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 10px rgba(0,255,0,.5);transition:opacity .15s;}
 #actions{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;}
 #actions-row{display:flex;gap:5px;}
-#bshoot{width:78px;height:56px;font-size:13px;letter-spacing:1px;}
-#bnuke,#bshovel{width:60px;height:48px;font-size:10px;letter-spacing:.5px;}
-#bpause{width:78px;height:32px;font-size:9px!important;line-height:1.1;}
+#bshoot{width:74px;height:50px;font-size:12px;letter-spacing:1px;}
+#bnuke,#bshovel{width:56px;height:42px;font-size:9px;letter-spacing:.5px;}
+#bpause{width:74px;height:28px;font-size:8px!important;line-height:1.1;}
 #bnuke{background:#1a0800!important;color:#ff6600!important;border:2px solid #ff6600!important;}
 #bshovel{background:#1a0f00!important;color:#c8a060!important;border:2px solid #8b6914!important;}
 #bshoot{color:#ff0!important;border-color:#ff0!important;}
@@ -54,11 +58,10 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action
 <a id="home" href="https://ardiejohnson.com">ARDIEJOHNSON.COM &#8599;</a>
 <canvas id="c"></canvas>
 <div id="btns">
-  <div id="dpad">
-    <button id="bup">&#9650;</button>
-    <button id="bleft">&#9664;</button>
-    <button id="bright">&#9654;</button>
-    <button id="bdown">&#9660;</button>
+  <div id="joyzone">
+    <div id="joy-base">
+      <div id="joy-knob"></div>
+    </div>
   </div>
   <div id="actions">
     <button id="bshoot">&#9679; SHOOT</button>
@@ -90,11 +93,32 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action
 <script>
 const cvs=document.getElementById('c'),ctx=cvs.getContext('2d');
 const W=620,H=500,MAX_ITEMS=9,KPW=15;
+
+// Keep --app-height synced to the space actually visible between mobile
+// browser toolbars (window.visualViewport shrinks/grows live as the
+// address/nav bars show or hide; window.innerHeight can lag or reflect the
+// large viewport instead). resizeCanvas() below uses this same source so the
+// canvas + controls always fit inside what's really on screen — nothing
+// clipped under a toolbar, no dead space from over-sizing the container.
+function viewportSize(){
+  if(window.visualViewport)return{w:window.visualViewport.width,h:window.visualViewport.height};
+  return{w:window.innerWidth,h:window.innerHeight};
+}
+function syncAppHeight(){
+  const{h}=viewportSize();
+  document.documentElement.style.setProperty('--app-height',h+'px');
+}
+
 function resizeCanvas(){
+  syncAppHeight();
   const btns=document.getElementById('btns'),hint=document.getElementById('hint');
-  const reserve=(btns?btns.offsetHeight:0)+(hint?hint.offsetHeight:0)+36;
-  const availW=Math.max(240,window.innerWidth-16);
-  const availH=Math.max(200,window.innerHeight-reserve-16);
+  const bs=getComputedStyle(document.body);
+  const padX=(parseFloat(bs.paddingLeft)||0)+(parseFloat(bs.paddingRight)||0);
+  const padY=(parseFloat(bs.paddingTop)||0)+(parseFloat(bs.paddingBottom)||0);
+  const{w:vw,h:vh}=viewportSize();
+  const reserve=(btns?btns.offsetHeight:0)+(hint?hint.offsetHeight:0)+padY+20;
+  const availW=Math.max(240,vw-padX);
+  const availH=Math.max(200,vh-reserve);
   const aspect=W/H;
   let cw,ch;
   if(availW/availH>aspect){ch=availH;cw=ch*aspect;}else{cw=availW;ch=cw/aspect;}
@@ -109,6 +133,10 @@ function resizeCanvas(){
 resizeCanvas();
 window.addEventListener('resize',resizeCanvas);
 window.addEventListener('orientationchange',resizeCanvas);
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize',resizeCanvas);
+  window.visualViewport.addEventListener('scroll',resizeCanvas);
+}
 
 // === LEADERBOARD ====================================================
 const LB_API='/api/scores';
@@ -529,16 +557,64 @@ document.addEventListener('keydown',e=>{
   }
 });
 document.addEventListener('keyup',e=>{delete keys[e.code];});
-setTimeout(()=>{
-  const map={bleft:'ArrowLeft',bup:'ArrowUp',bright:'ArrowRight',bdown:'ArrowDown'};
-  for(const[id,k]of Object.entries(map)){
-    const b=document.getElementById(id);if(!b)continue;
-    const on=()=>{keys[k]=true},off=()=>{delete keys[k]};
-    b.addEventListener('mousedown',on);b.addEventListener('mouseup',off);b.addEventListener('mouseleave',off);
-    b.addEventListener('touchstart',e=>{on();e.preventDefault();},{passive:false});
-    b.addEventListener('touchend',e=>{off();e.preventDefault();},{passive:false});
-    b.addEventListener('touchcancel',e=>{off();e.preventDefault();},{passive:false});
+
+// === On-screen movement joystick (touch AND mouse drag) =====================
+// Drives the same `keys[...]` map the keyboard uses, so update()'s movement
+// code (WASD/arrows) doesn't need to know a joystick exists. Supports
+// diagonals by setting two direction keys at once, exactly like holding two
+// arrow keys together.
+function initJoystick(){
+  const base=document.getElementById('joy-base'),knob=document.getElementById('joy-knob');
+  if(!base||!knob)return;
+  const MOVE_KEYS=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'];
+  const clearDirKeys=()=>{for(const k of MOVE_KEYS)delete keys[k];};
+  let activePointerId=null,cx=0,cy=0,maxR=0;
+  const DEAD=0.28; // fraction of maxR before a direction registers
+
+  function setKnob(dx,dy){knob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;}
+  function resetKnob(){setKnob(0,0);knob.style.opacity='.55';}
+  function updateFromPoint(clientX,clientY){
+    let dx=clientX-cx,dy=clientY-cy;
+    const dist=Math.hypot(dx,dy);
+    if(dist>maxR){const s=maxR/dist;dx*=s;dy*=s;}
+    setKnob(dx,dy);
+    clearDirKeys();
+    const nx=maxR?dx/maxR:0,ny=maxR?dy/maxR:0;
+    if(nx>DEAD)keys['ArrowRight']=true;
+    if(nx<-DEAD)keys['ArrowLeft']=true;
+    if(ny>DEAD)keys['ArrowDown']=true;
+    if(ny<-DEAD)keys['ArrowUp']=true;
   }
+  function start(e){
+    if(activePointerId!==null)return;
+    const r=base.getBoundingClientRect();
+    cx=r.left+r.width/2;cy=r.top+r.height/2;maxR=r.width/2;
+    activePointerId=e.pointerId;
+    knob.style.opacity='.85';
+    try{base.setPointerCapture(e.pointerId);}catch(err){}
+    updateFromPoint(e.clientX,e.clientY);
+    e.preventDefault();
+  }
+  function move(e){
+    if(e.pointerId!==activePointerId)return;
+    updateFromPoint(e.clientX,e.clientY);
+    e.preventDefault();
+  }
+  function end(e){
+    if(e.pointerId!==activePointerId)return;
+    activePointerId=null;
+    clearDirKeys();
+    resetKnob();
+  }
+  base.addEventListener('pointerdown',start,{passive:false});
+  base.addEventListener('pointermove',move,{passive:false});
+  base.addEventListener('pointerup',end);
+  base.addEventListener('pointercancel',end);
+  base.addEventListener('lostpointercapture',end);
+}
+
+setTimeout(()=>{
+  initJoystick();
   const btn=(id,fn)=>{const b=document.getElementById(id);if(b){b.addEventListener('click',fn);b.addEventListener('touchstart',e=>{fn();e.preventDefault();},{passive:false});}};
   // SHOOT mirrors the SPACE key so it also starts/restarts the game when not playing.
   btn('bshoot',shootOrStart);btn('bnuke',doNuke);btn('bshovel',doShovel);btn('bpause',togglePause);
