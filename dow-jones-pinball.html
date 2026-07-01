@@ -245,8 +245,10 @@ const walls = [
   W(272,700, 332,636, 0.55, 4.2),    // KICK face (upper-left)
 ];
 
-// Slingshot kick faces get flashed; track their indices
+// Slingshot kick faces: tag them so a hit flashes + scores + chirps
 const LEFT_SLING = walls.length-4, RIGHT_SLING = walls.length-1;
+walls[LEFT_SLING].sling = 'L'; walls[LEFT_SLING].flash = 0;
+walls[RIGHT_SLING].sling = 'R'; walls[RIGHT_SLING].flash = 0;
 
 // Bumpers (the "BULL" pop bumpers): {x,y,r}
 const bumpers = [
@@ -386,9 +388,8 @@ function endGame(){
   if(score>=bestScore && score>0){ title.textContent='NEW RECORD!'; }
   else { title.textContent='MARKET CLOSED'; }
   show('over-ov');
-  // qualify for leaderboard?
+  // maybePromptName() fetches the board, shows name entry if we qualify, and renders it
   maybePromptName();
-  fetchLeaderboard().then(renderBoard);
 }
 
 // ---------- Physics: collision resolvers ----------
@@ -501,11 +502,17 @@ function physics(){
       b.x += b.vx/SUB;
       b.y += b.vy/SUB;
 
-      for(const w of walls) collideSeg(b, w.ax,w.ay,w.bx,w.by, w.e, w.kick, 0, null);
+      for(const w of walls){
+        if(collideSeg(b, w.ax,w.ay,w.bx,w.by, w.e, w.kick, 0, null) && w.sling){
+          if(!(w.flash>0.5)){ addScore(120*bullRun); sSling(); }  // guard: score once per contact
+          w.flash=1;
+        }
+      }
       for(const p of posts) collideCircle(b, p.x,p.y,p.r, 0.5, 0.4);
       for(const bp of bumpers){
         if(collideCircle(b, bp.x,bp.y,bp.r, 0.35, 5.6)){
-          bp.lit=1; bumperHits++; addScore(250*bullRun); sBump();
+          if(bp.lit<0.9){ bumperHits++; addScore(250*bullRun); sBump(); }  // guard vs multi-substep double count
+          bp.lit=1;
         }
       }
       for(const t of targets){
@@ -717,7 +724,9 @@ function drawPosts(){
 }
 
 function drawSlings(ts){
-  // left sling triangle
+  // decay the flash set on a hit
+  if(walls[LEFT_SLING].flash>0) walls[LEFT_SLING].flash-=0.12;
+  if(walls[RIGHT_SLING].flash>0) walls[RIGHT_SLING].flash-=0.12;
   drawSlingTri([80,636],[80,724],[140,700], walls[LEFT_SLING].flash);
   drawSlingTri([332,636],[332,724],[272,700], walls[RIGHT_SLING].flash);
 }
