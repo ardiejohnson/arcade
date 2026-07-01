@@ -17,10 +17,11 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none
 body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:var(--app-height);font-family:monospace;padding:8px;padding-bottom:max(8px,env(safe-area-inset-bottom));}
 canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action:none;}
 /* Big readable SCORE / HI readout in the empty band above the canvas.
-   margin-top gives a fixed clearance below the fixed ARCADE/ARDIEJOHNSON.COM
-   corner links regardless of how much (or little) slack the vertical
-   centering leaves, so it can never collide with them on any viewport. */
-#hud{display:flex;gap:34px;align-items:center;justify-content:center;margin-top:40px;margin-bottom:2px;flex:0 0 auto;}
+   SCORE sits left, HI sits right (space-between) so they're not crowded
+   together. margin-top gives a fixed clearance below the fixed
+   ARCADE/ARDIEJOHNSON.COM corner links regardless of how much (or little)
+   slack the vertical centering leaves, so it can never collide with them. */
+#hud{display:flex;justify-content:space-between;align-items:center;margin-top:40px;margin-bottom:2px;width:100%;max-width:520px;padding:0 16px;flex:0 0 auto;}
 .hud-block{display:flex;flex-direction:column;align-items:center;line-height:1.15;}
 .hud-lbl{font-size:12px;letter-spacing:2px;color:#0f0;opacity:.65;}
 .hud-val{font-size:34px;font-weight:bold;color:#00ff88;text-shadow:0 0 12px rgba(0,255,136,.55);}
@@ -42,7 +43,7 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action
 #bshovel{background:#1a0f00!important;color:#c8a060!important;border:2px solid #8b6914!important;}
 #bshoot{color:#ff0!important;border-color:#ff0!important;}
 #pausezone{width:100%;max-width:480px;display:flex;justify-content:center;margin-top:10px;flex:0 0 auto;touch-action:none;}
-#bpause{width:min(280px,80%);height:64px;font-size:19px!important;letter-spacing:1.5px;line-height:1.15;border-radius:12px;font-weight:bold;}
+#bpause{width:min(200px,60%);height:50px;font-size:15px!important;letter-spacing:1px;line-height:1.15;border-radius:10px;font-weight:bold;}
 #bpause{color:#88aaff!important;border-color:#446688!important;}
 #hint{color:#333;font-size:10px;margin-top:4px;text-align:center;}
 #back{position:fixed;top:10px;left:10px;color:#666;font-family:monospace;font-size:11px;text-decoration:none;border:1px solid #333;padding:4px 8px;border-radius:3px;z-index:5;}
@@ -256,6 +257,7 @@ const CR=(x,y,r)=>{BL();ARC(x,y,r);STR()};
 const SL=(x1,y1,x2,y2)=>{BL();ML(x1,y1);LL(x2,y2);STR()};
 const SC=(c)=>{ctx.strokeStyle=c},FC=(c)=>{ctx.fillStyle=c},LW=(w)=>{ctx.lineWidth=w};
 const RR=(x,y,w,h)=>ctx.strokeRect(x,y,w,h);
+const RRP=(x,y,w,h,r)=>{BL();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();};
 
 const BADGES=[
   {w:1, n:"JUNK PATROL CADET",     d:"First day. Zero junk experience."},
@@ -1160,43 +1162,50 @@ function draw(){
       ctx.globalAlpha=1;
       clutter=_c;shovelMode=_sm;effects=_ef;person=_p;pMoving=_pm;pframe=_pf;
     }
-    // Bigger title + generously spaced-out title-screen text block. All
-    // y-offsets below are measured (via ctx.measureText / manual layout) to
-    // stay clear of the little live-demo scene that starts around y=345 and
-    // the HI score line pinned near the bottom, so nothing overlaps or gets
-    // clipped inside the fixed 620x500 canvas at any display scale.
-    const ty=112;
+    // Bigger title, stacked HOARDER / PATROL on two lines to use more of the
+    // canvas's vertical space, + generously spaced-out title-screen text
+    // block below it. All y-offsets are measured (via ctx.measureText /
+    // manual layout) to stay clear of the little live-demo scene that starts
+    // around y=345 and the HI score line pinned near the bottom, so nothing
+    // overlaps or gets clipped inside the fixed 620x500 canvas at any scale.
+    const ty=90,patrolY=ty+64;
     ctx.font='bold 60px monospace';
-    ctx.globalAlpha=.1;FC('#ff1133');ctx.fillText('HOARDER PATROL',W/2-3,ty);
-    FC('#1133ff');ctx.fillText('HOARDER PATROL',W/2+3,ty);ctx.globalAlpha=1;
-    [{b:40,a:.08},{b:22,a:.2},{b:10,a:.5},{b:3,a:.85},{b:0,a:1}].forEach(({b,a})=>{
-      ctx.shadowBlur=b;ctx.shadowColor='#00ff88';
-      FC(`rgba(0,255,155,${a})`);ctx.fillText('HOARDER PATROL',W/2,ty);
+    [['HOARDER',ty],['PATROL',patrolY]].forEach(([word,wy])=>{
+      ctx.globalAlpha=.1;FC('#ff1133');ctx.fillText(word,W/2-3,wy);
+      FC('#1133ff');ctx.fillText(word,W/2+3,wy);ctx.globalAlpha=1;
+      [{b:40,a:.08},{b:22,a:.2},{b:10,a:.5},{b:3,a:.85},{b:0,a:1}].forEach(({b,a})=>{
+        ctx.shadowBlur=b;ctx.shadowColor='#00ff88';
+        FC(`rgba(0,255,155,${a})`);ctx.fillText(word,W/2,wy);
+      });
+      ctx.shadowBlur=0;
+      if(Math.random()<.035){ctx.globalAlpha=.07;FC('#fff');ctx.fillText(word,W/2,wy);ctx.globalAlpha=1;}
     });
-    ctx.shadowBlur=0;
-    if(Math.random()<.035){ctx.globalAlpha=.07;FC('#fff');ctx.fillText('HOARDER PATROL',W/2,ty);ctx.globalAlpha=1;}
 
-    SC('rgba(0,255,100,0.3)');LW(1.5);
-    BL();ML(W/2-262,ty+12);LL(W/2-48,ty+12);STR();
-    BL();ML(W/2+48,ty+12);LL(W/2+262,ty+12);STR();
-    const diam=(cx,cy,r)=>{BL();ML(cx,cy-r);LL(cx+r,cy);LL(cx,cy+r);LL(cx-r,cy);ctx.closePath();STR();};
-    diam(W/2-40,ty+12,4);diam(W/2+40,ty+12,4);
-    const bx1=W/2-272,bx2=W/2+272,by1=ty-54,by2=ty+18,bl=16;
+    const bx1=W/2-146,bx2=W/2+146,by1=ty-52,by2=patrolY+18,bl=16;
     [[bx1,by1,1,1],[bx2,by1,-1,1],[bx1,by2,1,-1],[bx2,by2,-1,-1]].forEach(([x,y,sx,sy])=>{
       SC('rgba(0,255,100,0.35)');LW(1.5);BL();ML(x+sx*bl,y);LL(x,y);LL(x,y+sy*bl);STR();
     });
 
     ctx.font='13px monospace';FC('rgba(0,190,80,.6)');
-    ctx.fillText('defend the house  *  shoot junk  *  earn patrol badges',W/2,ty+68);
+    ctx.fillText('defend the house  *  shoot junk  *  earn patrol badges',W/2,patrolY+42);
     ctx.font='10px monospace';FC('rgba(60,110,60,.45)');
-    ctx.fillText('WASD / arrows: move  *  SPACE: shoot  *  N: nuke  *  X: shovel  *  P: pause',W/2,ty+94);
-    ctx.fillText('kill hoarders for shovels  *  chain reactions  *  boss every 5 levels',W/2,ty+110);
+    ctx.fillText('WASD / arrows: move  *  SPACE: shoot  *  N: nuke  *  X: shovel  *  P: pause',W/2,patrolY+68);
+    ctx.fillText('kill hoarders for shovels  *  chain reactions  *  boss every 5 levels',W/2,patrolY+84);
 
-    if(Math.floor(now/520)%2===0){
-      ctx.shadowBlur=18;ctx.shadowColor='#ffff00';
-      ctx.font='bold 18px monospace';FC('#ffee00');
-      ctx.fillText('>>  PRESS SPACE/ENTER OR TAP TO START  <<',W/2,ty+158);
+    // Big tappable-looking START button (yellow) instead of small blinking
+    // instruction text — reads clearly as a button, especially on mobile
+    // where tapping it is the only way in. Space/Enter still work too.
+    {
+      const startCY=patrolY+129,bw=270,bh=54,bxx=W/2-bw/2,byy=startCY-bh/2;
+      const pulse=Math.floor(now/500)%2===0;
+      FC('rgba(20,20,0,0.55)');RRP(bxx,byy,bw,bh,10);FIL();
+      ctx.shadowBlur=pulse?22:10;ctx.shadowColor='#ffee00';
+      SC('#ffee00');LW(pulse?3:2);RRP(bxx,byy,bw,bh,10);STR();
       ctx.shadowBlur=0;
+      ctx.font='bold 26px monospace';FC('#ffee00');
+      ctx.fillText('TAP TO START',W/2,startCY+9);
+      ctx.font='9px monospace';FC('rgba(220,220,0,.5)');
+      ctx.fillText('or press SPACE / ENTER',W/2,startCY+bh/2+16);
     }
 
     if(hiScore>0){
