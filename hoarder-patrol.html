@@ -2,25 +2,37 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>HOARDER PATROL</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{height:100%;overflow:hidden;}
-body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:monospace;padding:8px;}
-canvas{display:block;background:#000;max-width:100%;max-height:100%;}
-#btns{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
-#btns button{background:#111;color:#0f0;border:1px solid #0f0;padding:8px 11px;font-family:monospace;font-size:14px;border-radius:4px;cursor:pointer;user-select:none;}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;}
+body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-height:100vh;font-family:monospace;padding:8px;padding-bottom:max(10px,env(safe-area-inset-bottom));}
+canvas{display:block;background:#000;max-width:100%;max-height:100%;touch-action:none;}
+#btns{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-top:8px;width:100%;max-width:520px;touch-action:none;}
+#btns button{background:#111;color:#0f0;border:1px solid #0f0;font-family:monospace;font-size:14px;border-radius:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;display:flex;align-items:center;justify-content:center;padding:0;}
+#dpad{display:grid;grid-template-columns:repeat(3,50px);grid-template-rows:repeat(3,50px);gap:4px;flex:0 0 auto;}
+#dpad button{width:50px;height:50px;font-size:20px;}
+#bup{grid-column:2;grid-row:1;}
+#bleft{grid-column:1;grid-row:2;}
+#bright{grid-column:3;grid-row:2;}
+#bdown{grid-column:2;grid-row:3;}
+#actions{display:flex;flex-direction:column;align-items:center;gap:5px;flex:0 0 auto;}
+#actions-row{display:flex;gap:5px;}
+#bshoot{width:78px;height:56px;font-size:13px;letter-spacing:1px;}
+#bnuke,#bshovel{width:60px;height:48px;font-size:10px;letter-spacing:.5px;}
+#bpause{width:78px;height:32px;font-size:9px!important;line-height:1.1;}
 #bnuke{background:#1a0800!important;color:#ff6600!important;border:2px solid #ff6600!important;}
 #bshovel{background:#1a0f00!important;color:#c8a060!important;border:2px solid #8b6914!important;}
 #bshoot{color:#ff0!important;border-color:#ff0!important;}
-#bpause{color:#88aaff!important;border-color:#446688!important;font-size:10px!important;line-height:1.3;}
+#bpause{color:#88aaff!important;border-color:#446688!important;}
 #hint{color:#333;font-size:10px;margin-top:4px;text-align:center;}
 #back{position:fixed;top:10px;left:10px;color:#666;font-family:monospace;font-size:11px;text-decoration:none;border:1px solid #333;padding:4px 8px;border-radius:3px;z-index:5;}
 #back:hover{color:#0f0;border-color:#0f0;}
 #home{position:fixed;top:10px;right:10px;color:#666;font-family:monospace;font-size:11px;text-decoration:none;border:1px solid #333;padding:4px 8px;border-radius:3px;z-index:5;}
 #home:hover{color:#0f0;border-color:#0f0;}
-#name-entry{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;font-family:monospace;}
+#name-entry{position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:100;font-family:monospace;touch-action:auto;}
+#name-entry input{touch-action:auto;user-select:text;-webkit-user-select:text;}
 #name-entry .box{background:#000;border:2px solid #ffdd00;padding:24px 28px;text-align:center;min-width:280px;box-shadow:0 0 50px rgba(255,221,0,0.45);}
 #name-entry h2{color:#ffdd00;font-size:18px;margin-bottom:4px;letter-spacing:2px;}
 #name-entry .sub{color:#888;font-size:10px;margin-bottom:14px;letter-spacing:1px;}
@@ -42,14 +54,20 @@ canvas{display:block;background:#000;max-width:100%;max-height:100%;}
 <a id="home" href="https://ardiejohnson.com">ARDIEJOHNSON.COM &#8599;</a>
 <canvas id="c"></canvas>
 <div id="btns">
-  <button id="bleft">&#9664;</button>
-  <button id="bup">&#9650;</button>
-  <button id="bright">&#9654;</button>
-  <button id="bdown">&#9660;</button>
-  <button id="bshoot">&#9679; SHOOT</button>
-  <button id="bnuke">&#9762; NUKE</button>
-  <button id="bshovel">SHOVEL</button>
-  <button id="bpause">BATHROOM<br>BREAK</button>
+  <div id="dpad">
+    <button id="bup">&#9650;</button>
+    <button id="bleft">&#9664;</button>
+    <button id="bright">&#9654;</button>
+    <button id="bdown">&#9660;</button>
+  </div>
+  <div id="actions">
+    <button id="bshoot">&#9679; SHOOT</button>
+    <div id="actions-row">
+      <button id="bnuke">&#9762; NUKE</button>
+      <button id="bshovel">SHOVEL</button>
+    </div>
+    <button id="bpause">BATHROOM BREAK</button>
+  </div>
 </div>
 <div id="hint">Move: WASD/arrows &middot; Shoot: SPACE &middot; Nuke: N &middot; Shovel: X (near house) &middot; Pause: P</div>
 
@@ -488,6 +506,15 @@ function doShoot(){
   }
   sS();
 }
+// Mirrors the SPACE key: shoot while playing, start/restart otherwise.
+// Used by the on-screen SHOOT button and by tapping the canvas so touch
+// players can actually begin/restart the game (keyboard already could via Space/Enter/R).
+function shootOrStart(){
+  if(nameEntryPending)return;
+  if(badgePopup&&badgePopup.timer>0){dismissBadge();return;}
+  if(paused)return;
+  if(gameState==='play')doShoot();else initGame();
+}
 document.addEventListener('keydown',e=>{
   if(nameEntryPending)return; // let the form handle its own keys
   if(!keys[e.code]){keys[e.code]=true;
@@ -510,11 +537,19 @@ setTimeout(()=>{
     b.addEventListener('mousedown',on);b.addEventListener('mouseup',off);b.addEventListener('mouseleave',off);
     b.addEventListener('touchstart',e=>{on();e.preventDefault();},{passive:false});
     b.addEventListener('touchend',e=>{off();e.preventDefault();},{passive:false});
+    b.addEventListener('touchcancel',e=>{off();e.preventDefault();},{passive:false});
   }
   const btn=(id,fn)=>{const b=document.getElementById(id);if(b){b.addEventListener('click',fn);b.addEventListener('touchstart',e=>{fn();e.preventDefault();},{passive:false});}};
-  btn('bshoot',doShoot);btn('bnuke',doNuke);btn('bshovel',doShovel);btn('bpause',togglePause);
-  cvs.addEventListener('click',()=>{if(badgePopup&&badgePopup.timer>0)dismissBadge();});
-  cvs.addEventListener('touchstart',e=>{if(badgePopup&&badgePopup.timer>0){dismissBadge();e.preventDefault();}},{passive:false});
+  // SHOOT mirrors the SPACE key so it also starts/restarts the game when not playing.
+  btn('bshoot',shootOrStart);btn('bnuke',doNuke);btn('bshovel',doShovel);btn('bpause',togglePause);
+  cvs.addEventListener('click',()=>{
+    if(badgePopup&&badgePopup.timer>0){dismissBadge();return;}
+    if(!nameEntryPending&&gameState!=='play')initGame();
+  });
+  cvs.addEventListener('touchstart',e=>{
+    if(badgePopup&&badgePopup.timer>0){dismissBadge();e.preventDefault();return;}
+    if(!nameEntryPending&&gameState!=='play'){initGame();e.preventDefault();}
+  },{passive:false});
 },0);
 
 const PMSG=["Go ahead. The junk will wait. (It won't.)","Nature calls. The hoarder answers.","The beanie babies are forming a plan.","The rocking chair is still coming.","Hydrate. The house still needs you."];
@@ -1042,7 +1077,7 @@ function draw(){
     if(Math.floor(now/520)%2===0){
       ctx.shadowBlur=18;ctx.shadowColor='#ffff00';
       ctx.font='bold 18px monospace';FC('#ffee00');
-      ctx.fillText('>>  PRESS SPACE OR ENTER TO START  <<',W/2,ty+118);
+      ctx.fillText('>>  PRESS SPACE/ENTER OR TAP TO START  <<',W/2,ty+118);
       ctx.shadowBlur=0;
     }
 
@@ -1113,7 +1148,7 @@ function draw(){
     dLeaderboardGameOver();
 
     ctx.font='bold 13px monospace';FC('#ff0');ctx.textAlign='center';
-    if(Math.floor(Date.now()/600)%2===0)ctx.fillText('PRESS ENTER OR R TO TRY AGAIN',W/2,H-18);
+    if(Math.floor(Date.now()/600)%2===0)ctx.fillText('PRESS ENTER/R OR TAP TO PLAY AGAIN',W/2,H-18);
     return;
   }
   if(shake>0){ctx.save();ctx.translate(rnd(-shake,shake),rnd(-shake*.4,shake*.4));}
